@@ -566,6 +566,28 @@ def run_calc(m_b, b_b, c_b, t_b):
     think_rot = load_think(t_b) if t_b else None
     bdf = load_base(b_b, cmap, think_rot)
     months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
+
+    # 씽크현황+SAP 월별 둘 다 있을 때: DW07/DW08 거래처는 SAP 잔고를 최종 기준으로 사용
+    # SAP 잔고 = 0 이거나 SAP에 없으면 해당 월 제거 (씽크현황 누적계산 오류 방지)
+    if t_b and m_b:
+        sap_months = load_monthly(m_b)
+        sap_bal: dict = {}
+        for _me in sap_months:
+            for _, _r in _me["data"].iterrows():
+                _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
+                sap_bal[_k] = (int(_r["잔고"]), int(_r["현회전일"]))
+        _씽크ch = {"씽크", "DW11", "DW12"}
+        for _me in months:
+            _df = _me["data"].copy()
+            for _i, _r in _df[~_df["채널"].isin(_씽크ch)].iterrows():
+                _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
+                if _k in sap_bal:
+                    _df.at[_i, "잔고"]     = sap_bal[_k][0]
+                    _df.at[_i, "현회전일"] = sap_bal[_k][1]
+                else:
+                    _df.at[_i, "잔고"] = 0  # SAP에 없음 = 수금 완료로 처리
+            _me["data"] = _df[_df["잔고"] > 0].reset_index(drop=True)
+
     org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
     # org 정보 결과에 병합
