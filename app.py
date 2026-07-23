@@ -638,58 +638,57 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── 2컬럼 차트 ───────────────────────────────────────────────
-col_l, col_r = st.columns([3, 2], gap="medium")
+# ── 거래처 차트 (전체 너비) ──────────────────────────────────
+with st.container(border=True):
+    st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
+    charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
+    if charge.empty:
+        st.markdown('<p style="text-align:center;color:#bbb;padding:2.5rem 0;font-size:.85rem">해당 월 청구 발생 없음</p>', unsafe_allow_html=True)
+    else:
+        mean_v = charge["지체보상금"].mean()
+        all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
+        fig = go.Figure(go.Bar(
+            x=charge["지체보상금"].values[::-1],
+            y=charge["판매처명"].values[::-1],
+            orientation="h",
+            marker_color=["#c0392b" if v >= mean_v else "#2f80c0"
+                          for v in charge["지체보상금"].values[::-1]],
+            marker_line_width=0,
+            text=[fmt_won(v, short=True) for v in charge["지체보상금"].values[::-1]],
+            textposition="outside",
+            cliponaxis=False,
+            textfont=dict(size=11, color="#444"),
+            hovertemplate="<b>%{y}</b><br>지체보상금: %{text}<extra></extra>",
+        ))
+        fig.update_layout(
+            plot_bgcolor="white", paper_bgcolor="white",
+            margin=dict(t=5, b=5, l=160, r=100),
+            height=max(250, min(len(charge) * 42, 400)),
+            xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
+                       zeroline=False, showline=False, range=[0, all_max*1.35]),
+            yaxis=dict(tickfont=dict(size=12), showgrid=False),
+            font=dict(family=FONT),
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-with col_l:
-    with st.container(border=True):
-        st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
-        charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
-        if charge.empty:
-            st.markdown('<p style="text-align:center;color:#bbb;padding:2.5rem 0;font-size:.85rem">해당 월 청구 발생 없음</p>', unsafe_allow_html=True)
-        else:
-            mean_v = charge["지체보상금"].mean()
-            all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
-            fig = go.Figure(go.Bar(
-                x=charge["지체보상금"].values[::-1],
-                y=charge["판매처명"].values[::-1],
-                orientation="h",
-                marker_color=["#c0392b" if v >= mean_v else "#2f80c0"
-                              for v in charge["지체보상금"].values[::-1]],
-                marker_line_width=0,
-                text=[fmt_won(v, short=True) for v in charge["지체보상금"].values[::-1]],
-                textposition="outside",
-                cliponaxis=False,
-                textfont=dict(size=11, color="#444"),
-                hovertemplate="<b>%{y}</b><br>지체보상금: %{text}<extra></extra>",
-            ))
-            fig.update_layout(
-                plot_bgcolor="white", paper_bgcolor="white",
-                margin=dict(t=5, b=5, l=160, r=100),
-                height=max(350, min(len(charge) * 42, 520)),
-                xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
-                           zeroline=False, showline=False, range=[0, all_max*1.35]),
-                yaxis=dict(tickfont=dict(size=12), showgrid=False),
-                font=dict(family=FONT),
-                showlegend=False,
-            )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+# ── 트렌드 차트 2개 나란히 (전체 너비) ───────────────────────
+sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
+all_12 = [f"{sel_yr_str}-{mo:02d}" for mo in range(1, 13)]
+x_labels = [f"{int(m.split('-')[1])}월" for m in all_12]
+bar_vals = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]
+cum_vals = []
+run = 0
+for v in bar_vals:
+    run += v
+    cum_vals.append(round(run, 1))
+bar_colors = ["#e8604c" if m == sel else "#f2a99a" for m in all_12]
+all_mo_max = max(bar_vals) if max(bar_vals) > 0 else 1
+cum_max = max(cum_vals) if max(cum_vals) > 0 else 1
 
-with col_r:
-    sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
-    all_12 = [f"{sel_yr_str}-{mo:02d}" for mo in range(1, 13)]
-    x_labels = [f"{int(m.split('-')[1])}월" for m in all_12]
-    bar_vals = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]
-    cum_vals = []
-    run = 0
-    for v in bar_vals:
-        run += v
-        cum_vals.append(round(run, 1))
-    bar_colors = ["#e8604c" if m == sel else "#f2a99a" for m in all_12]
-    all_mo_max = max(bar_vals) if max(bar_vals) > 0 else 1
-    cum_max = max(cum_vals) if max(cum_vals) > 0 else 1
+trend_l, trend_r = st.columns(2, gap="medium")
 
-    # 위: 월별 발생 바차트
+with trend_l:
     with st.container(border=True):
         st.markdown(
             '<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">월별 지체보상금 발생</div>'
@@ -700,21 +699,21 @@ with col_r:
             marker_color=bar_colors, marker_line_width=0,
             text=[f"{v:,.0f}" if v > 0 else "" for v in bar_vals],
             textposition="outside", cliponaxis=False,
-            textfont=dict(size=10, color="#555"),
+            textfont=dict(size=11, color="#555"),
             hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
         ))
         fig2a.update_layout(
             plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=5, b=5, l=45, r=15),
-            height=220,
+            margin=dict(t=5, b=5, l=50, r=20),
+            height=300,
             yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-                       range=[0, all_mo_max * 1.45], tickfont=dict(size=9), title=None),
+                       range=[0, all_mo_max * 1.45], tickfont=dict(size=10), title=None),
             xaxis=dict(showgrid=False, tickfont=dict(size=11)),
             font=dict(family=FONT), showlegend=False, bargap=0.35,
         )
         st.plotly_chart(fig2a, use_container_width=True, config={"displayModeBar": False})
 
-    # 아래: 누적 라인차트
+with trend_r:
     with st.container(border=True):
         st.markdown(
             '<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">연간 누적 지체보상금</div>'
@@ -736,15 +735,15 @@ with col_r:
             marker=dict(size=7, color="#e67e22"),
             text=[f"{v:,.0f}" if v else "" for v in cum_display],
             textposition="top center",
-            textfont=dict(size=10, color="#c0580a"),
+            textfont=dict(size=11, color="#c0580a"),
             hoverinfo="skip", showlegend=False,
         ))
         fig2b.update_layout(
             plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=5, b=5, l=45, r=15),
-            height=220,
+            margin=dict(t=5, b=5, l=50, r=20),
+            height=300,
             yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-                       range=[0, cum_max * 1.35], tickfont=dict(size=9), title=None),
+                       range=[0, cum_max * 1.35], tickfont=dict(size=10), title=None),
             xaxis=dict(showgrid=False, tickfont=dict(size=11)),
             font=dict(family=FONT),
         )
