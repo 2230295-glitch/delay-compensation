@@ -285,7 +285,7 @@ def load_think_monthly(file_bytes):
             cum_sale += sale; cum_coll += coll
             잔고 = cum_sale - cum_coll
             if 잔고 <= 0: continue
-            base_sale = sale if sale > 0 else (sum(recent_sales) / len(recent_sales) if recent_sales else 0)
+            base_sale = sale if sale > 0 else (recent_sales[-1] if recent_sales else 0)
             if base_sale <= 0: continue   # 매출 이력 없으면 계산 불가, 스킵
             현회전일 = int(잔고 * 30 / base_sale)
             key = (yr, mo)
