@@ -217,7 +217,11 @@ def load_contract(file_bytes, sap_df):
     for _, r in df[df['코드'].notna()].iterrows():
         c = r['코드']
         if c not in result or not r['지체여부']:
-            result[c] = {"지체여부": r['지체여부'], "요율": r['요율']}
+            result[c] = {
+                "지체여부": r['지체여부'], "요율": r['요율'],
+                "계약유형": str(r.get('계약유형', '')).strip(),
+                "사업자번호": str(r.get('사업자번호', '')).strip(),
+            }
     n_yes = sum(1 for v in result.values() if v["지체여부"])
     n_no  = sum(1 for v in result.values() if not v["지체여부"])
     return result, n_yes, n_no
@@ -569,6 +573,13 @@ def run_calc(m_b, b_b, c_b, t_b):
         result["사무소"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사무소", ""))
         result["사업부"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사업부", ""))
         result["담당자"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("담당자", ""))
+    # 계약서 마스터 정보 병합
+    if cmap and not result.empty:
+        result["계약유형"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("계약유형", ""))
+        result["사업자번호"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("사업자번호", ""))
+    else:
+        if "계약유형" not in result.columns:  result["계약유형"]  = ""
+        if "사업자번호" not in result.columns: result["사업자번호"] = ""
     return result, cmap, n_yes, n_no
 
 # ──────────────────────────────────────────────────────────────
@@ -932,8 +943,12 @@ with tab1:
                 f' = {int(r["지체보상금"]):,}원')
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    disp = view[["판매처명","현 미수금","유효기준회전일","현 회전일",
-                 "지연일수(누적)","청구 증분일수","요율","지체보상금","계산 근거","비고"]]
+    _all_cols = ["판매처코드","판매처명","채널","사업자번호","계약유형",
+                 "사업부","사무소","담당자",
+                 "현 미수금","유효기준회전일","현 회전일",
+                 "지연일수(누적)","청구 증분일수","요율","지체보상금","계산 근거","비고"]
+    disp = view[[c for c in _all_cols if c in view.columns]]
+    disp = disp.rename(columns={"판매처코드":"거래처코드","채널":"거래유형"})
 
     def _sty(r):
         if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
