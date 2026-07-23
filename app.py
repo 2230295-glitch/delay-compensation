@@ -2,7 +2,7 @@
 지체보상금 대시보드 v6
 실행: streamlit run app.py
 """
-import io, re
+import io, re, calendar
 from datetime import date
 from pathlib import Path
 
@@ -282,13 +282,16 @@ def load_think_monthly(file_bytes):
             coll = _v(cidx['수금']) if '수금' in cidx else 0.0
             cum_sale += sale; cum_coll += coll
             잔고 = cum_sale - cum_coll
+            days = calendar.monthrange(yr, mo)[1]  # 해당 월 실제 일수
             if 잔고 <= 0:
                 prev_현회전일 = 0
                 continue
             if sale > 0:
-                현회전일 = int(잔고 * 30 / sale)
+                # 세금계산서 월말 발행 → 발행 당월은 회전일 1일로 시작
+                현회전일 = 1
             else:
-                현회전일 = prev_현회전일 + 30  # 매출 없으면 잔고가 30일 더 지연
+                # 수금 없으면 해당 월 실제 일수만큼 지연 누적
+                현회전일 = prev_현회전일 + days
             prev_현회전일 = 현회전일
             key = (yr, mo)
             if key not in months_dict: months_dict[key] = []
