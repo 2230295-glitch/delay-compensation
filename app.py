@@ -130,6 +130,16 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
   border: 1px solid #e0e5ef !important;
   box-shadow: 0 1px 6px rgba(0,0,0,.06) !important;
 }
+
+/* ── 연도/월 선택기 ── */
+.yr-mo-wrap { display:flex; align-items:flex-start; gap:1.2rem; margin-bottom:1.2rem; }
+.yr-btns { display:flex; flex-direction:column; gap:.4rem; }
+.mo-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:.35rem; flex:1; }
+.mo-btn-outer button, .yr-btn-outer button {
+  border-radius:6px !important; font-weight:700 !important;
+  font-size:.82rem !important; padding:.35rem .5rem !important;
+  transition: all .15s !important;
+}
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
@@ -539,13 +549,38 @@ mo_sum = result_df.groupby("기준월")["지체보상금"].sum()
 if "sel_mo" not in st.session_state or st.session_state.sel_mo not in months_sorted:
     st.session_state.sel_mo = months_sorted[-1]
 
-st.markdown('<div style="font-size:.7rem;font-weight:800;color:#a0aec0;letter-spacing:.1em;margin-bottom:.4rem">기준월 선택</div>', unsafe_allow_html=True)
-btn_cols = st.columns(len(months_sorted))
-for i, m in enumerate(months_sorted):
-    if btn_cols[i].button(mo_label(m), key=f"mo_{m}",
-                          type="primary" if m == st.session_state.sel_mo else "secondary",
-                          use_container_width=True):
-        st.session_state.sel_mo = m; st.rerun()
+# 연도 목록 추출
+years_avail = sorted(set(m.split("-")[0] for m in months_sorted))
+if "sel_yr" not in st.session_state or st.session_state.sel_yr not in years_avail:
+    st.session_state.sel_yr = st.session_state.sel_mo.split("-")[0]
+
+with st.container():
+    st.markdown('<div style="font-size:.7rem;font-weight:800;color:#a0aec0;letter-spacing:.1em;margin-bottom:.6rem">기준월 선택</div>', unsafe_allow_html=True)
+    yr_c = st.columns([1]*len(years_avail) + [6-len(years_avail)] if len(years_avail) < 6 else [1]*len(years_avail))
+    for i, yr in enumerate(years_avail):
+        with yr_c[i]:
+            if st.button(f"{yr}년", key=f"yr_{yr}",
+                         type="primary" if yr == st.session_state.sel_yr else "secondary",
+                         use_container_width=True):
+                st.session_state.sel_yr = yr
+                yr_months = [m for m in months_sorted if m.startswith(yr)]
+                if st.session_state.sel_mo not in yr_months:
+                    st.session_state.sel_mo = yr_months[-1]
+                st.rerun()
+
+    yr_months = [m for m in months_sorted if m.startswith(st.session_state.sel_yr)]
+    mo_cols = st.columns(6)
+    for i in range(6):
+        if i < len(yr_months):
+            m = yr_months[i]
+            mo_num = int(m.split("-")[1])
+            with mo_cols[i]:
+                if st.button(f"{mo_num}월", key=f"mo_{m}",
+                             type="primary" if m == st.session_state.sel_mo else "secondary",
+                             use_container_width=True):
+                    st.session_state.sel_mo = m; st.rerun()
+        else:
+            mo_cols[i].empty()
 
 sel     = st.session_state.sel_mo
 sel_idx = months_sorted.index(sel)
@@ -614,6 +649,7 @@ with col_l:
             st.markdown('<p style="text-align:center;color:#bbb;padding:2.5rem 0;font-size:.85rem">해당 월 청구 발생 없음</p>', unsafe_allow_html=True)
         else:
             mean_v = charge["지체보상금"].mean()
+            all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
             fig = go.Figure(go.Bar(
                 x=charge["지체보상금"].values[::-1],
                 y=charge["판매처명"].values[::-1],
@@ -630,9 +666,9 @@ with col_l:
             fig.update_layout(
                 plot_bgcolor="white", paper_bgcolor="white",
                 margin=dict(t=5, b=5, l=160, r=100),
-                height=max(300, len(charge) * 45),
+                height=max(350, min(len(charge) * 42, 520)),
                 xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
-                           zeroline=False, showline=False, range=[0, charge["지체보상금"].max()*1.35]),
+                           zeroline=False, showline=False, range=[0, all_max*1.35]),
                 yaxis=dict(tickfont=dict(size=12), showgrid=False),
                 font=dict(family=FONT),
                 showlegend=False,
@@ -645,6 +681,7 @@ with col_r:
         labels  = [mo_label(m) for m in months_sorted]
         amounts = [int(mo_sum.get(m, 0)) for m in months_sorted]
         colors  = ["#c0392b" if m == sel else "#4a90c4" for m in months_sorted]
+        all_mo_max = max(int(mo_sum.get(m, 0)) for m in months_sorted)
         fig2 = go.Figure(go.Bar(
             x=labels, y=amounts,
             marker_color=colors, marker_line_width=0,
@@ -659,7 +696,7 @@ with col_r:
             margin=dict(t=15, b=5, l=45, r=25),
             height=280,
             yaxis=dict(gridcolor="#f0f3f8", tickformat=",d", zeroline=False,
-                       range=[0, max(amounts)*1.3] if max(amounts) > 0 else [0, 1]),
+                       range=[0, all_mo_max*1.3 if all_mo_max > 0 else 1]),
             xaxis=dict(showgrid=False, tickfont=dict(size=10)),
             font=dict(family=FONT),
             showlegend=False, bargap=0.35,
