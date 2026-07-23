@@ -638,6 +638,61 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ── 신규연체 / 추가연체 / 수금완료 ────────────────────────────
+_yr2, _mo2 = int(sel.split("-")[0]), int(sel.split("-")[1])
+_prev_mo = f"{_yr2-1}-12" if _mo2 == 1 else f"{_yr2}-{_mo2-1:02d}"
+_prev_df = result_df[result_df["기준월"] == _prev_mo]
+_prev_map = {r["판매처코드"]: r for _, r in _prev_df.iterrows()}
+_curr_map = {r["판매처코드"]: r for _, r in sel_df.iterrows()}
+
+_신규, _추가, _수금 = [], [], []
+for _code in set(_prev_map) | set(_curr_map):
+    _c = _curr_map.get(_code)
+    _p = _prev_map.get(_code)
+    _cj = int(_c["지체보상금"]) if _c is not None else 0
+    _pj = int(_p["지체보상금"]) if _p is not None else 0
+    _cp = int(_c["현 미수금"]) if _c is not None else 0
+    _pp = int(_p["현 미수금"]) if _p is not None else 0
+    _nm = (_c if _c is not None else _p)["판매처명"]
+    if _cj > 0 and _pj == 0:
+        _신규.append({"명칭": _nm, "금액": _cj})
+    elif _cj > 0 and _pj > 0:
+        _추가.append({"명칭": _nm, "금액": _cj})
+    if _pj > 0 and _cj == 0:
+        _수금.append({"명칭": _nm, "금액": max(_pp - _cp, 0) or _pp})
+
+for _lst in (_신규, _추가, _수금):
+    _lst.sort(key=lambda x: -x["금액"])
+
+def _cmp_card(title, lst, icon, border_color, sign, amt_color):
+    total = sum(x["금액"] for x in lst)
+    rows = ""
+    for x in lst[:5]:
+        rows += (f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                 f'padding:.32rem 0;border-bottom:1px solid #f5f5f5">'
+                 f'<span style="font-size:.81rem;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:68%">{x["명칭"]}</span>'
+                 f'<span style="font-size:.82rem;font-weight:700;color:{amt_color};white-space:nowrap">'
+                 f'{sign}{fmt_won(x["금액"],short=True)}</span></div>')
+    if len(lst) > 5:
+        etc = lst[5:]; etc_tot = sum(e["금액"] for e in etc)
+        rows += f'<div style="font-size:.72rem;color:#aaa;padding:.35rem 0">그 외 {len(etc)}처 ({fmt_won(etc_tot,short=True)})</div>'
+    if not lst:
+        rows = '<div style="color:#ccc;font-size:.82rem;padding:1.2rem 0;text-align:center">해당 없음</div>'
+    hdr = (f'<div style="font-weight:800;font-size:.86rem;color:{border_color};margin-bottom:.6rem">'
+           f'{icon} {title}'
+           f'<span style="font-weight:400;font-size:.76rem;color:#999;margin-left:.5rem">'
+           f'총 {fmt_won(total,short=True)} &nbsp;{len(lst)}건</span></div>')
+    return (f'<div style="border:1px solid #eee;border-left:4px solid {border_color};'
+            f'border-radius:8px;padding:.85rem 1rem;min-height:160px">{hdr}{rows}</div>')
+
+_cc1, _cc2, _cc3 = st.columns(3, gap="medium")
+with _cc1:
+    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규, "🔴", "#e74c3c", "+", "#c0392b"), unsafe_allow_html=True)
+with _cc2:
+    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가, "🟡", "#e67e22", "+", "#d35400"), unsafe_allow_html=True)
+with _cc3:
+    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "🟢", "#27ae60", "-", "#27ae60"), unsafe_allow_html=True)
+
 # ── 거래처 차트 (전체 너비) ──────────────────────────────────
 with st.container(border=True):
     st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
