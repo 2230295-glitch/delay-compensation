@@ -197,7 +197,7 @@ def load_contract(file_bytes, sap_df):
     n_no  = sum(1 for v in result.values() if not v["지체여부"])
     return result, n_yes, n_no
 
-def load_base(file_bytes, cmap=None):
+def load_base(file_bytes, cmap=None, think_rotations=None):
     df = pd.read_excel(io.BytesIO(file_bytes), dtype=str).dropna(how="all")
     df.columns = [str(c).strip() for c in df.columns]
     out = []
@@ -212,9 +212,32 @@ def load_base(file_bytes, cmap=None):
         use = info.get("지체여부", True); rate = info.get("요율", 1/1000)
         out.append({"코드":code,"명칭":name,"기준회전일":int(base),
                     "유효기준회전일":eff,"지체여부":use,"요율":rate})
+    existing = {r["코드"] for r in out}
+    if think_rotations:
+        for code, rot in think_rotations.items():
+            if code not in existing:
+                info = (cmap or {}).get(code, {})
+                use = info.get("지체여부", True); rate = info.get("요율", 1/1000)
+                out.append({"코드":code,"명칭":"","기준회전일":rot,
+                            "유효기준회전일":rot,"지체여부":use,"요율":rate})
     return pd.DataFrame(out)
 
-def load_monthly(file_bytes):
+def load_think(file_bytes):
+    """씽크현황 파일에서 씽크 거래처 코드 + 약정회전일 반환"""
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=2, dtype=str)
+    codes = {}
+    for _, r in df.iloc[1:].iterrows():
+        code = str(r.iloc[2]).strip()
+        rot_raw = str(r.iloc[8]).strip()  # 회전일 컬럼
+        if not code or code in ('nan', '판매처'): continue
+        try:
+            rot = int(str(rot_raw).replace('일','').strip())
+        except:
+            rot = 30
+        codes[code] = rot
+    return codes  # {판매처코드: 약정회전일}
+
+def load_monthly(file_bytes, think_codes=None):
     df = pd.read_excel(io.BytesIO(file_bytes), dtype=str).dropna(how="all")
     df.columns = [str(c).strip() for c in df.columns]
     def _ym(v):
@@ -227,6 +250,9 @@ def load_monthly(file_bytes):
     df = df.dropna(subset=["_잔고","_일수"]).copy(); df["_일수"] = df["_일수"].astype(int)
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
+    if think_codes and "채널" in df.columns:
+        dw07_mask = df["채널"] == "DW07"
+        df = df[~dw07_mask | df["판매처"].isin(think_codes)]
     if "담당자"   in df.columns: df = df[~df["담당자"].isin(EXCLUDE_MGR)]
     if "사업부명" in df.columns: df = df[~df["사업부명"].apply(lambda x: any(k in str(x) for k in EXCLUDE_BU))]
     df = df[~df["판매처"].isin(EXCLUDE_CODES)]
@@ -324,10 +350,11 @@ def make_full_excel(df):
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
 # ──────────────────────────────────────────────────────────────
-BASE_PATH = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
-MO_FOLDER = Path("input/월별잔고회전일")   # 폴더 안 xlsx 파일 전부 자동 합산
-CT_LIST   = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
-CT_PATH   = CT_LIST[0] if CT_LIST else None
+BASE_PATH  = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
+MO_FOLDER  = Path("input/월별잔고회전일")
+THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
+CT_LIST    = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
+CT_PATH    = CT_LIST[0] if CT_LIST else None
 
 def _read_mo_folder(folder: Path):
     """폴더 내 모든 xlsx/xls 파일을 합쳐서 bytes 반환"""
@@ -384,23 +411,26 @@ with st.sidebar:
 if use_default:
     _mo_result = _read_mo_folder(MO_FOLDER) if MO_FOLDER.exists() else None
     m_b, _mo_names = _mo_result if _mo_result else (None, [])
-    b_b = BASE_PATH.read_bytes() if BASE_PATH.exists() else None
-    c_b = CT_PATH.read_bytes()   if CT_PATH            else None
+    b_b = BASE_PATH.read_bytes()   if BASE_PATH.exists()  else None
+    c_b = CT_PATH.read_bytes()     if CT_PATH             else None
+    t_b = THINK_PATH.read_bytes()  if THINK_PATH          else None
 else:
     m_b = f_monthly.read()  if f_monthly  else None
     _mo_names = [f_monthly.name] if f_monthly else []
     b_b = f_base.read()     if f_base     else None
     c_b = f_contract.read() if f_contract else None
+    t_b = THINK_PATH.read_bytes() if THINK_PATH else None
 
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b):
+def run_calc(m_b, b_b, c_b, t_b):
     sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
     sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
     cmap = n_yes = n_no = None
     if c_b:
         cmap, n_yes, n_no = load_contract(c_b, sap_raw)
-    bdf = load_base(b_b, cmap)
-    months = load_monthly(m_b)
+    think_rot = load_think(t_b) if t_b else None
+    bdf = load_base(b_b, cmap, think_rot)
+    months = load_monthly(m_b, think_codes=set(think_rot.keys()) if think_rot else None)
     result = calculate(months, bdf)
     return result, cmap, n_yes, n_no
 
@@ -420,7 +450,7 @@ result_df = contract_map = None
 if m_b and b_b:
     try:
         with st.spinner("계산 중..."):
-            result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b)
+            result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b)
     except Exception as e:
         st.error(f"오류: {e}"); st.stop()
 else:
