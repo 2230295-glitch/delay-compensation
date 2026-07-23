@@ -657,18 +657,19 @@ with st.container():
                 st.rerun()
 
     yr_months = [m for m in months_sorted if m.startswith(st.session_state.sel_yr)]
-    mo_cols = st.columns(6)
-    for i in range(6):
-        if i < len(yr_months):
-            m = yr_months[i]
-            mo_num = int(m.split("-")[1])
-            with mo_cols[i]:
-                if st.button(f"{mo_num}월", key=f"mo_{m}",
-                             type="primary" if m == st.session_state.sel_mo else "secondary",
-                             use_container_width=True):
-                    st.session_state.sel_mo = m; st.rerun()
-        else:
-            mo_cols[i].empty()
+    yr_months_set = set(yr_months)
+    has_second_row = any(int(m.split("-")[1]) > 6 for m in yr_months)
+    for row_start in ([1, 7] if has_second_row else [1]):
+        mc = st.columns(6)
+        for i, col in enumerate(mc):
+            mo = row_start + i
+            m  = f"{st.session_state.sel_yr}-{mo:02d}"
+            if m in yr_months_set:
+                with col:
+                    if st.button(f"{mo}월", key=f"mo_{m}",
+                                 type="primary" if m == st.session_state.sel_mo else "secondary",
+                                 use_container_width=True):
+                        st.session_state.sel_mo = m; st.rerun()
 
 sel     = st.session_state.sel_mo
 sel_idx = months_sorted.index(sel)
