@@ -222,20 +222,83 @@ def load_base(file_bytes, cmap=None, think_rotations=None):
                             "유효기준회전일":rot,"지체여부":use,"요율":rate})
     return pd.DataFrame(out)
 
+def _parse_rot(v):
+    s = str(v).strip()
+    if '개월' in s:
+        try: return int(s.replace('개월','').strip()) * 30
+        except: return 30
+    if '일' in s:
+        try: return int(s.replace('일','').strip())
+        except: return 30
+    try: return int(s)
+    except: return 30
+
 def load_think(file_bytes):
-    """씽크현황 파일에서 씽크 거래처 코드 + 약정회전일 반환"""
-    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=2, dtype=str)
+    """씽크현황에서 씽크 거래처 코드 + 기준회전일 반환 (load_base 보완용)"""
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=None, dtype=str)
     codes = {}
-    for _, r in df.iloc[1:].iterrows():
+    for _, r in df.iloc[4:].iterrows():
         code = str(r.iloc[2]).strip()
-        rot_raw = str(r.iloc[8]).strip()  # 회전일 컬럼
-        if not code or code in ('nan', '판매처'): continue
-        try:
-            rot = int(str(rot_raw).replace('일','').strip())
-        except:
-            rot = 30
-        codes[code] = rot
-    return codes  # {판매처코드: 약정회전일}
+        if not code or code in ('nan', '판매처', 'None'): continue
+        codes[code] = _parse_rot(r.iloc[8])
+    return codes
+
+def load_think_monthly(file_bytes):
+    """씽크현황 월별 매출/수금 → 누적잔고·현회전일 역산, calculate()용 months 반환"""
+    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=None, dtype=str)
+    row2 = df.iloc[2].tolist()
+    row3 = df.iloc[3].tolist()
+
+    # 월별 컬럼 인덱스 수집 {mo_str: {'매출': col_idx, '수금': col_idx}}
+    mo_cols = {}
+    cur = None
+    for i, (r2, r3) in enumerate(zip(row2, row3)):
+        s2 = str(r2).strip()
+        if '.' in s2 and s2 not in ('nan','None'):
+            cur = s2; mo_cols[cur] = {}
+        if cur and str(r3).strip() in ('매출','수금') and str(r3).strip() not in mo_cols[cur]:
+            mo_cols[cur][str(r3).strip()] = i
+
+    # 유효한 연월만 (합계·계약금액 제외)
+    valid = {k: v for k, v in mo_cols.items()
+             if '합계' not in k and '계약' not in k and len(k) == 7}
+
+    months_dict = {}
+    for _, row in df.iloc[4:].iterrows():
+        code = str(row.iloc[2]).strip()
+        name = str(row.iloc[3]).strip()
+        if not code or code in ('nan','None','판매처'): continue
+        기준 = _parse_rot(row.iloc[8])
+
+        cum_sale = cum_coll = 0.0
+        recent_sales = []   # 최근 비영 매출 추적 (월매출=0 대체용)
+        for mo_str, cidx in sorted(valid.items()):
+            try: yr, mo = int(mo_str.split('.')[0]), int(mo_str.split('.')[1])
+            except: continue
+            def _v(col):
+                try: return float(str(row.iloc[col]).replace(',','').strip() or '0') * 1_000_000
+                except: return 0.0
+            sale = _v(cidx['매출']) if '매출' in cidx else 0.0
+            coll = _v(cidx['수금']) if '수금' in cidx else 0.0
+            if sale > 0: recent_sales.append(sale)
+            if len(recent_sales) > 3: recent_sales.pop(0)
+            cum_sale += sale; cum_coll += coll
+            잔고 = cum_sale - cum_coll
+            if 잔고 <= 0: continue
+            base_sale = sale if sale > 0 else (sum(recent_sales) / len(recent_sales) if recent_sales else 0)
+            if base_sale <= 0: continue   # 매출 이력 없으면 계산 불가, 스킵
+            현회전일 = int(잔고 * 30 / base_sale)
+            key = (yr, mo)
+            if key not in months_dict: months_dict[key] = []
+            months_dict[key].append({
+                "연": yr, "월": mo, "코드": code, "명칭": name,
+                "채널": "씽크", "잔고": int(잔고), "현회전일": 현회전일,
+                "_기준회전일_override": 기준,
+            })
+
+    months = [{"yr": yr, "mo": mo, "data": pd.DataFrame(rows)}
+              for (yr, mo), rows in sorted(months_dict.items())]
+    return months
 
 def load_monthly(file_bytes, think_codes=None):
     df = pd.read_excel(io.BytesIO(file_bytes), dtype=str).dropna(how="all")
@@ -276,7 +339,8 @@ def calculate(months, base_df):
             if code not in bmap: continue
             b = bmap[code]
             if not b["지체여부"]: continue
-            기준 = b["유효기준회전일"]; 요율 = b["요율"]
+            기준 = int(row["_기준회전일_override"]) if "_기준회전일_override" in row and pd.notna(row["_기준회전일_override"]) else b["유효기준회전일"]
+            요율 = b["요율"]
             현 = row["현회전일"]; 잔 = row["잔고"]
             지연 = max(0, 현 - 기준); prev = cum.get(code, 0)
             if 지연 <= 0: cum[code] = 0; 증분 = 0
@@ -430,7 +494,7 @@ def run_calc(m_b, b_b, c_b, t_b):
         cmap, n_yes, n_no = load_contract(c_b, sap_raw)
     think_rot = load_think(t_b) if t_b else None
     bdf = load_base(b_b, cmap, think_rot)
-    months = load_monthly(m_b, think_codes=set(think_rot.keys()) if think_rot else None)
+    months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
     result = calculate(months, bdf)
     return result, cmap, n_yes, n_no
 
