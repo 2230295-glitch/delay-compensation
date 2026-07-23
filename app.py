@@ -271,7 +271,7 @@ def load_think_monthly(file_bytes):
         기준 = _parse_rot(row.iloc[8])
 
         cum_sale = cum_coll = 0.0
-        recent_sales = []   # 최근 비영 매출 추적 (월매출=0 대체용)
+        prev_현회전일 = 0
         for mo_str, cidx in sorted(valid.items()):
             try: yr, mo = int(mo_str.split('.')[0]), int(mo_str.split('.')[1])
             except: continue
@@ -280,14 +280,16 @@ def load_think_monthly(file_bytes):
                 except: return 0.0
             sale = _v(cidx['매출']) if '매출' in cidx else 0.0
             coll = _v(cidx['수금']) if '수금' in cidx else 0.0
-            if sale > 0: recent_sales.append(sale)
-            if len(recent_sales) > 3: recent_sales.pop(0)
             cum_sale += sale; cum_coll += coll
             잔고 = cum_sale - cum_coll
-            if 잔고 <= 0: continue
-            base_sale = sale if sale > 0 else (recent_sales[-1] if recent_sales else 0)
-            if base_sale <= 0: continue   # 매출 이력 없으면 계산 불가, 스킵
-            현회전일 = int(잔고 * 30 / base_sale)
+            if 잔고 <= 0:
+                prev_현회전일 = 0
+                continue
+            if sale > 0:
+                현회전일 = int(잔고 * 30 / sale)
+            else:
+                현회전일 = prev_현회전일 + 30  # 매출 없으면 잔고가 30일 더 지연
+            prev_현회전일 = 현회전일
             key = (yr, mo)
             if key not in months_dict: months_dict[key] = []
             months_dict[key].append({
