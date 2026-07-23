@@ -943,12 +943,16 @@ with tab1:
                 f' = {int(r["지체보상금"]):,}원')
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    _all_cols = ["판매처코드","판매처명","채널","사업자번호","계약유형",
-                 "사업부","사무소","담당자",
-                 "현 미수금","유효기준회전일","현 회전일",
-                 "지연일수(누적)","청구 증분일수","요율","지체보상금","계산 근거","비고"]
+    # 컬럼 순서: 식별 → 조직 → 재무 → 지체계산 → 참고
+    _all_cols = [
+        "판매처코드", "판매처명", "사업자번호", "계약유형", "채널",
+        "사업부", "사무소", "담당자",
+        "현 미수금",
+        "유효기준회전일", "현 회전일", "지연일수(누적)", "청구 증분일수",
+        "요율", "지체보상금", "계산 근거", "비고",
+    ]
     disp = view[[c for c in _all_cols if c in view.columns]]
-    disp = disp.rename(columns={"판매처코드":"거래처코드","채널":"거래유형"})
+    disp = disp.rename(columns={"판매처코드": "거래처코드", "채널": "거래채널"})
 
     def _sty(r):
         if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
@@ -960,6 +964,25 @@ with tab1:
         disp.style.apply(_sty, axis=1)
             .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
         use_container_width=True, height=430,
+        column_config={
+            "거래처코드":    st.column_config.TextColumn("거래처코드",   width=110),
+            "판매처명":      st.column_config.TextColumn("거래처명",     width=200),
+            "사업자번호":    st.column_config.TextColumn("사업자번호",   width=110),
+            "계약유형":      st.column_config.TextColumn("계약유형",     width=90),
+            "거래채널":      st.column_config.TextColumn("거래채널",     width=90),
+            "사업부":        st.column_config.TextColumn("사업부",       width=90),
+            "사무소":        st.column_config.TextColumn("사무소",       width=100),
+            "담당자":        st.column_config.TextColumn("담당자",       width=80),
+            "현 미수금":     st.column_config.NumberColumn("현 미수금",  width=110, format="%,.0f"),
+            "유효기준회전일":st.column_config.NumberColumn("기준회전일", width=80),
+            "현 회전일":     st.column_config.NumberColumn("현회전일",   width=70),
+            "지연일수(누적)":st.column_config.NumberColumn("지연일수",   width=70),
+            "청구 증분일수": st.column_config.NumberColumn("청구일수",   width=70),
+            "요율":          st.column_config.TextColumn("요율",         width=65),
+            "지체보상금":    st.column_config.NumberColumn("지체보상금", width=110, format="%,.0f"),
+            "계산 근거":     st.column_config.TextColumn("계산 근거",    width=260),
+            "비고":          st.column_config.TextColumn("비고",         width=80),
+        },
     )
 
 with tab2:
