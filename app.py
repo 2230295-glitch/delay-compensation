@@ -312,6 +312,7 @@ def load_think_monthly(file_bytes):
                 "연": yr, "월": mo, "코드": code, "명칭": name,
                 "채널": "씽크", "잔고": int(잔고), "현회전일": 현회전일,
                 "_기준회전일_override": 기준,
+                "사무소": "", "사업부": "", "담당자": "",
             })
 
     months = [{"yr": yr, "mo": mo, "data": pd.DataFrame(rows)}
@@ -342,7 +343,11 @@ def load_monthly(file_bytes, think_codes=None):
     for (yr, mo), grp in df.groupby(["_yr","_mo"]):
         rows = [{"연":int(yr),"월":int(mo),"코드":str(r["판매처"]).strip(),
                  "명칭":str(r.get("판매처명","")).strip(),"채널":str(r.get("채널","")).strip(),
-                 "잔고":r["_잔고"],"현회전일":r["_일수"]} for _, r in grp.iterrows()]
+                 "잔고":r["_잔고"],"현회전일":r["_일수"],
+                 "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
+                 "사업부":str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
+                 "담당자":str(r.get("담당자","")).strip() if "담당자" in r.index else "",
+                 } for _, r in grp.iterrows()]
         months.append({"yr":int(yr),"mo":int(mo),"data":pd.DataFrame(rows)})
     months.sort(key=lambda x: (x["yr"], x["mo"]))
     return months
@@ -367,7 +372,9 @@ def calculate(months, base_df):
             rate_str = f"1/{int(round(1/요율))}" if 요율 > 0 else "-"
             results.append({
                 "기준월":f"{yr}-{mo:02d}","판매처코드":code,"판매처명":row["명칭"],
-                "채널":row["채널"],"현 미수금":int(잔),"기준회전일(SAP)":b["기준회전일"],
+                "채널":row["채널"],
+                "사무소":row.get("사무소",""),"사업부":row.get("사업부",""),"담당자":row.get("담당자",""),
+                "현 미수금":int(잔),"기준회전일(SAP)":b["기준회전일"],
                 "유효기준회전일":기준,"현 회전일":현,"지연일수(누적)":지연,
                 "청구 증분일수":증분,"지체보상금":보상,"요율":rate_str,
                 "비고":"청구" if 보상 > 0 else ("정상화" if 지연 == 0 and prev > 0 else ""),
@@ -724,6 +731,18 @@ with st.container(border=True):
             v = int(row["지체보상금"])
             pct = min(v / all_max * 100, 100)
             color = rank_colors[i] if i < len(rank_colors) else "#888"
+            사무소 = str(row.get("사무소","")).strip()
+            사업부 = str(row.get("사업부","")).strip()
+            담당자 = str(row.get("담당자","")).strip()
+            # 표시할 조직 정보: 사무소 > 사업부 순으로 첫 번째 유효값
+            org = 사무소 if 사무소 and 사무소 not in ("nan","") else (사업부 if 사업부 and 사업부 not in ("nan","") else "")
+            org_badge = (
+                f'<span style="background:#f0f2f5;color:#666;font-size:.7rem;'
+                f'padding:.1rem .45rem;border-radius:3px;margin-left:.4rem">{org}</span>'
+            ) if org else ""
+            mgr_txt = (
+                f'<span style="font-size:.72rem;color:#aaa;margin-left:.3rem">· {담당자}</span>'
+            ) if 담당자 and 담당자 not in ("nan","") else ""
             rank_badge = (
                 f'<span style="background:{color};color:#fff;font-size:.72rem;font-weight:800;'
                 f'width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;'
@@ -734,10 +753,11 @@ with st.container(border=True):
                         gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f5f5f5">
               {rank_badge}
               <div>
-                <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">{row['판매처명']}</div>
+                <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">
+                  {row['판매처명']}{org_badge}{mgr_txt}
+                </div>
                 <div style="background:#f0f2f5;border-radius:4px;height:7px;overflow:hidden">
-                  <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px;
-                              transition:width .3s"></div>
+                  <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px"></div>
                 </div>
               </div>
               <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v,short=True)}</div>
