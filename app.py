@@ -734,6 +734,9 @@ with st.container(border=True):
             textfont=dict(size=11, color="#444"),
             hovertemplate="<b>%{y}</b><br>지체보상금: %{text}<extra></extra>",
         ))
+    n_bars = max(len(charge), 1)
+    bar_px = 48  # 막대 두께 고정 (px)
+    bargap = max(0.05, 1 - (bar_px * n_bars) / CHART_H)
     fig.update_layout(
         plot_bgcolor="white", paper_bgcolor="white",
         margin=dict(t=5, b=5, l=180, r=110),
@@ -744,6 +747,7 @@ with st.container(border=True):
         yaxis=dict(tickfont=dict(size=12), showgrid=False),
         font=dict(family=FONT),
         showlegend=False,
+        bargap=bargap,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
