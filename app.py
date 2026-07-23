@@ -438,8 +438,9 @@ THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path(
 CT_LIST    = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
 CT_PATH    = CT_LIST[0] if CT_LIST else None
 
-def _read_mo_folder(folder: Path):
-    """폴더 내 모든 xlsx/xls 파일을 합쳐서 bytes 반환"""
+@st.cache_data(show_spinner=False)
+def _read_mo_folder(folder_str: str):
+    folder = Path(folder_str)
     files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
     if not files:
         return None
@@ -449,6 +450,11 @@ def _read_mo_folder(folder: Path):
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
         combined.to_excel(w, index=False)
     return buf.getvalue(), [f.name for f in files]
+
+@st.cache_data(show_spinner=False)
+def _read_bytes(path_str: str):
+    p = Path(path_str)
+    return p.read_bytes() if p.exists() else None
 
 # ──────────────────────────────────────────────────────────────
 # 사이드바
@@ -491,11 +497,11 @@ with st.sidebar:
 # 데이터
 # ──────────────────────────────────────────────────────────────
 if use_default:
-    _mo_result = _read_mo_folder(MO_FOLDER) if MO_FOLDER.exists() else None
+    _mo_result = _read_mo_folder(str(MO_FOLDER)) if MO_FOLDER.exists() else None
     m_b, _mo_names = _mo_result if _mo_result else (None, [])
-    b_b = BASE_PATH.read_bytes()   if BASE_PATH.exists()  else None
-    c_b = CT_PATH.read_bytes()     if CT_PATH             else None
-    t_b = THINK_PATH.read_bytes()  if THINK_PATH          else None
+    b_b = _read_bytes(str(BASE_PATH))
+    c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
+    t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 else:
     m_b = f_monthly.read()  if f_monthly  else None
     _mo_names = [f_monthly.name] if f_monthly else []
@@ -727,7 +733,7 @@ with st.container(border=True):
         fig.update_layout(
             plot_bgcolor="white", paper_bgcolor="white",
             margin=dict(t=5, b=5, l=160, r=100),
-            height=max(250, min(len(charge) * 42, 400)),
+            height=320,
             xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
                        zeroline=False, showline=False, range=[0, all_max*1.35]),
             yaxis=dict(tickfont=dict(size=12), showgrid=False),
@@ -755,7 +761,7 @@ trend_l, trend_r = st.columns(2, gap="medium")
 with trend_l:
     with st.container(border=True):
         st.markdown(
-            '<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">월별 지체보상금 발생</div>'
+            f'<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">{sel_yr_str}년 월별 지체보상금 발생</div>'
             '<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원</div>',
             unsafe_allow_html=True)
         fig2a = go.Figure(go.Bar(
@@ -780,7 +786,7 @@ with trend_l:
 with trend_r:
     with st.container(border=True):
         st.markdown(
-            '<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">연간 누적 지체보상금</div>'
+            f'<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">{sel_yr_str}년 누적 지체보상금</div>'
             '<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원</div>',
             unsafe_allow_html=True)
         # 데이터 있는 마지막 달 이후는 None (미래 달 평탄 방지)
