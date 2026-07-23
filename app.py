@@ -664,49 +664,43 @@ for _code in set(_prev_map) | set(_curr_map):
 for _lst in (_신규, _추가, _수금):
     _lst.sort(key=lambda x: -x["금액"])
 
-def _cmp_card(title, lst, hdr_bg, hdr_txt, sign, amt_color, divider):
+def _cmp_card(title, lst, accent, sign, amt_color):
     total = sum(x["금액"] for x in lst)
     rows = ""
     for i, x in enumerate(lst[:5]):
         rows += (
             f'<div style="display:flex;justify-content:space-between;align-items:center;'
-            f'padding:.4rem 0;border-bottom:1px solid {divider}">'
-            f'<div style="display:flex;align-items:center;gap:.45rem;min-width:0;flex:1">'
-            f'<span style="font-size:.68rem;color:#bbb;width:.9rem;flex-shrink:0;text-align:right">{i+1}</span>'
-            f'<span style="font-size:.83rem;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;'
-            f'white-space:nowrap;font-weight:500">{x["명칭"]}</span>'
+            f'padding:.42rem 0;border-bottom:1px solid #f2f2f2">'
+            f'<div style="display:flex;align-items:center;gap:.5rem;min-width:0;flex:1">'
+            f'<span style="font-size:.68rem;color:#ccc;width:.8rem;flex-shrink:0">{i+1}</span>'
+            f'<span style="font-size:.83rem;color:#2d2d2d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{x["명칭"]}</span>'
             f'</div>'
-            f'<span style="font-size:.85rem;font-weight:700;color:{amt_color};'
-            f'white-space:nowrap;margin-left:.6rem">{sign}{fmt_won(x["금액"],short=True)}</span>'
+            f'<span style="font-size:.84rem;font-weight:700;color:{amt_color};white-space:nowrap;margin-left:.5rem">'
+            f'{sign}{fmt_won(x["금액"],short=True)}</span>'
             f'</div>'
         )
     if len(lst) > 5:
         etc = lst[5:]; etc_tot = sum(e["금액"] for e in etc)
-        rows += (f'<div style="font-size:.73rem;color:#aaa;padding:.45rem 0 0">'
-                 f'그 외 소액 {len(etc)}처 ({fmt_won(etc_tot,short=True)})</div>')
+        rows += f'<div style="font-size:.72rem;color:#bbb;padding:.4rem 0 0">그 외 소액 {len(etc)}처 ({fmt_won(etc_tot,short=True)})</div>'
     if not lst:
         rows = '<div style="color:#ccc;font-size:.82rem;padding:1.8rem 0;text-align:center">해당 없음</div>'
     return (
-        f'<div style="border-radius:10px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08)">'
-        f'<div style="background:{hdr_bg};padding:.75rem 1.1rem">'
-        f'<div style="font-size:.82rem;font-weight:800;color:{hdr_txt}">{title}</div>'
-        f'<div style="font-size:.78rem;color:{hdr_txt};opacity:.75;margin-top:.1rem">'
-        f'총 {fmt_won(total,short=True)} &nbsp;·&nbsp; {len(lst)}건</div>'
+        f'<div style="background:#fff;border-radius:10px;border-top:3px solid {accent};'
+        f'box-shadow:0 1px 8px rgba(0,0,0,.07);padding:1rem 1.15rem 1.1rem">'
+        f'<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.65rem">'
+        f'<span style="font-size:.88rem;font-weight:800;color:{accent}">{title}</span>'
+        f'<span style="font-size:.76rem;color:#aaa">{len(lst)}건 &nbsp;·&nbsp; 총 <b style="color:#555">{fmt_won(total,short=True)}</b></span>'
         f'</div>'
-        f'<div style="background:#ffffff;padding:.6rem 1.1rem 1rem">{rows}</div>'
-        f'</div>'
+        f'{rows}</div>'
     )
 
 _cc1, _cc2, _cc3 = st.columns(3, gap="medium")
 with _cc1:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규,
-        "#e74c3c", "#ffffff", "+", "#c0392b", "#fce8e8"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규, "#e74c3c", "+", "#c0392b"), unsafe_allow_html=True)
 with _cc2:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가,
-        "#e67e22", "#ffffff", "+", "#c96a10", "#fde8d0"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가, "#e67e22", "+", "#c96a10"), unsafe_allow_html=True)
 with _cc3:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금,
-        "#27ae60", "#ffffff", "-", "#1a7a42", "#d5f5e3"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42"), unsafe_allow_html=True)
 
 # ── 거래처 차트 (전체 너비) ──────────────────────────────────
 with st.container(border=True):
