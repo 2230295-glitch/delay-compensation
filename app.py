@@ -719,10 +719,13 @@ with trend_r:
             '<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">연간 누적 지체보상금</div>'
             '<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원</div>',
             unsafe_allow_html=True)
-        cum_display = [v if v > 0 else None for v in cum_vals]
+        # 데이터 있는 마지막 달 이후는 None (미래 달 평탄 방지)
+        last_data_idx = max((i for i, v in enumerate(bar_vals) if v > 0), default=-1)
+        cum_line = [cum_vals[i] if i <= last_data_idx else None for i in range(12)]
+        cum_pts  = [cum_vals[i] if i <= last_data_idx and cum_vals[i] > 0 else None for i in range(12)]
         fig2b = go.Figure()
         fig2b.add_trace(go.Scatter(
-            x=x_labels, y=cum_vals,
+            x=x_labels, y=cum_line,
             mode="lines",
             line=dict(color="#e67e22", width=2.5),
             fill="tozeroy", fillcolor="rgba(230,126,34,0.08)",
@@ -730,10 +733,10 @@ with trend_r:
             showlegend=False,
         ))
         fig2b.add_trace(go.Scatter(
-            x=x_labels, y=cum_display,
+            x=x_labels, y=cum_pts,
             mode="markers+text",
             marker=dict(size=7, color="#e67e22"),
-            text=[f"{v:,.0f}" if v else "" for v in cum_display],
+            text=[f"{v:,.0f}" if v else "" for v in cum_pts],
             textposition="top center",
             textfont=dict(size=11, color="#c0580a"),
             hoverinfo="skip", showlegend=False,
