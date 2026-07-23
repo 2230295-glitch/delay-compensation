@@ -276,7 +276,10 @@ def load_think_monthly(file_bytes):
             try: yr, mo = int(mo_str.split('.')[0]), int(mo_str.split('.')[1])
             except: continue
             def _v(col):
-                try: return float(str(row.iloc[col]).replace(',','').strip() or '0') * 1_000_000
+                try:
+                    s = str(row.iloc[col]).replace(',','').strip()
+                    if s.lower() in ('nan','none',''): return 0.0
+                    return float(s) * 1_000_000
                 except: return 0.0
             sale = _v(cidx['매출']) if '매출' in cidx else 0.0
             coll = _v(cidx['수금']) if '수금' in cidx else 0.0
