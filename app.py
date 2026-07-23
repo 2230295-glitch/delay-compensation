@@ -744,52 +744,57 @@ with _cc3:
     st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42"), unsafe_allow_html=True)
 
 # ── 청구 발생 거래처 랭킹 ─────────────────────────────────────
-with st.container(border=True):
-    st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
-    charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
-    all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
+charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
+all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
 
-    if charge.empty:
-        st.markdown('<div style="text-align:center;color:#ccc;padding:3rem 0;font-size:.9rem">해당 월 청구 발생 없음</div>', unsafe_allow_html=True)
-    else:
-        rank_colors = ["#c0392b","#e74c3c","#e67e22","#d4ac0d","#2980b9","#2471a3","#1a5276","#196f3d","#1e8449","#117a65"]
-        rows_html = ""
-        for i, row in charge.iterrows():
-            v = int(row["지체보상금"])
-            pct = min(v / all_max * 100, 100)
-            color = rank_colors[i] if i < len(rank_colors) else "#888"
-            사무소 = str(row.get("사무소","")).strip()
-            사업부 = str(row.get("사업부","")).strip()
-            담당자 = str(row.get("담당자","")).strip()
-            # 표시할 조직 정보: 사무소 > 사업부 순으로 첫 번째 유효값
-            org = 사무소 if 사무소 and 사무소 not in ("nan","") else (사업부 if 사업부 and 사업부 not in ("nan","") else "")
-            org_badge = (
-                f'<span style="background:#f0f2f5;color:#666;font-size:.7rem;'
-                f'padding:.1rem .45rem;border-radius:3px;margin-left:.4rem">{org}</span>'
-            ) if org else ""
-            mgr_txt = (
-                f'<span style="font-size:.72rem;color:#aaa;margin-left:.3rem">· {담당자}</span>'
-            ) if 담당자 and 담당자 not in ("nan","") else ""
-            rank_badge = (
-                f'<span style="background:{color};color:#fff;font-size:.72rem;font-weight:800;'
-                f'width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;'
-                f'align-items:center;justify-content:center;flex-shrink:0">{i+1}</span>'
-            )
-            rows_html += f"""
-            <div style="display:grid;grid-template-columns:2rem 1fr 5rem;align-items:center;
-                        gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f5f5f5">
-              {rank_badge}
-              <div>
-                <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">
-                  {row['판매처명']}{org_badge}{mgr_txt}
-                </div>
-                <div style="background:#f0f2f5;border-radius:4px;height:7px;overflow:hidden">
-                  <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px"></div>
-                </div>
-              </div>
-              <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v,short=True)}</div>
-            </div>"""
-        st.markdown(f'<div style="padding:.2rem 0">{rows_html}</div>', unsafe_allow_html=True)
+if charge.empty:
+    inner_html = '<div style="text-align:center;color:#ccc;padding:3rem 0;font-size:.9rem">해당 월 청구 발생 없음</div>'
+else:
+    rank_colors = ["#c0392b","#e74c3c","#e67e22","#d4ac0d","#2980b9","#2471a3","#1a5276","#196f3d","#1e8449","#117a65"]
+    rows_html = ""
+    for i, row in charge.iterrows():
+        v = int(row["지체보상금"])
+        pct = min(v / all_max * 100, 100)
+        color = rank_colors[i] if i < len(rank_colors) else "#888"
+        사무소 = str(row.get("사무소","")).strip()
+        사업부 = str(row.get("사업부","")).strip()
+        담당자 = str(row.get("담당자","")).strip()
+        org = 사무소 if 사무소 and 사무소 not in ("nan","") else (사업부 if 사업부 and 사업부 not in ("nan","") else "")
+        org_badge = (
+            f'<span style="background:#f0f2f5;color:#666;font-size:.7rem;'
+            f'padding:.1rem .45rem;border-radius:3px;margin-left:.4rem">{org}</span>'
+        ) if org else ""
+        mgr_txt = (
+            f'<span style="font-size:.72rem;color:#aaa;margin-left:.3rem">· {담당자}</span>'
+        ) if 담당자 and 담당자 not in ("nan","") else ""
+        rank_badge = (
+            f'<span style="background:{color};color:#fff;font-size:.72rem;font-weight:800;'
+            f'width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;'
+            f'align-items:center;justify-content:center;flex-shrink:0">{i+1}</span>'
+        )
+        rows_html += f"""
+        <div style="display:grid;grid-template-columns:2rem 1fr 5rem;align-items:center;
+                    gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f0f2f5">
+          {rank_badge}
+          <div>
+            <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">
+              {row['판매처명']}{org_badge}{mgr_txt}
+            </div>
+            <div style="background:#eef0f4;border-radius:4px;height:7px;overflow:hidden">
+              <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px"></div>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v,short=True)}</div>
+        </div>"""
+    inner_html = f'<div style="padding:.2rem 0">{rows_html}</div>'
+
+st.markdown(
+    f'<div style="background:#ffffff;border-radius:10px;border:1px solid #e0e5ef;'
+    f'box-shadow:0 1px 6px rgba(0,0,0,.07);padding:1rem 1.4rem 1.2rem;margin-bottom:1rem">'
+    f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>'
+    f'{inner_html}</div>',
+    unsafe_allow_html=True
+)
 
 # ── 월별 + 누적 콤보 차트 (전체 너비) ────────────────────────
 sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
