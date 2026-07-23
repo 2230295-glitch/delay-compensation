@@ -516,6 +516,27 @@ else:
     c_b = f_contract.read() if f_contract else None
     t_b = THINK_PATH.read_bytes() if THINK_PATH else None
 
+def _build_org_map(m_b):
+    """SAP 월별 파일에서 판매처코드 → {사무소, 사업부, 담당자} 매핑"""
+    if not m_b:
+        return {}
+    try:
+        df = pd.read_excel(io.BytesIO(m_b), dtype=str).dropna(how="all")
+        df.columns = [str(c).strip() for c in df.columns]
+        org_map = {}
+        for _, r in df.iterrows():
+            code = str(r.get("판매처","")).strip()
+            if not code or code == "nan":
+                continue
+            org_map[code] = {
+                "사무소": str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
+                "사업부": str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
+                "담당자": str(r.get("담당자명","")).strip() if "담당자명" in r.index else "",
+            }
+        return org_map
+    except Exception:
+        return {}
+
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b):
     sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
@@ -526,7 +547,13 @@ def run_calc(m_b, b_b, c_b, t_b):
     think_rot = load_think(t_b) if t_b else None
     bdf = load_base(b_b, cmap, think_rot)
     months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
+    org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
+    # org 정보 결과에 병합
+    if org_map and not result.empty:
+        result["사무소"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사무소", ""))
+        result["사업부"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사업부", ""))
+        result["담당자"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("담당자", ""))
     return result, cmap, n_yes, n_no
 
 # ──────────────────────────────────────────────────────────────
