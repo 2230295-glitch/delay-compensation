@@ -110,11 +110,20 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
 .stDownloadButton > button:hover { background: #243444 !important; }
 
 /* ── 탭 ── */
-.stTabs [data-baseweb="tab-list"] { gap: .25rem; border-bottom: 2px solid #dde3ef; }
+.stTabs {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e0e5ef;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  padding: .8rem 1.2rem 1rem;
+}
+.stTabs [data-baseweb="tab-list"] { gap: .25rem; border-bottom: 2px solid #dde3ef; background: transparent; }
 .stTabs [data-baseweb="tab"] {
   font-weight: 700; font-size: .84rem; padding: .38rem 1rem; color: #aaa;
   font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  background: transparent !important;
 }
+.stTabs [data-baseweb="tab-panel"] { background: transparent !important; padding: .6rem 0 0; }
 .stTabs [aria-selected="true"] { color: #1b2838 !important; border-bottom: 2px solid #1b2838 !important; }
 
 /* ── 버튼 ── */
@@ -124,11 +133,18 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
 }
 
 /* ── border 컨테이너 ── */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  background: #fff !important;
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stVerticalBlockBorderWrapper"] > div,
+[data-testid="stVerticalBlockBorderWrapper"] > div > div[data-testid="stVerticalBlock"] {
+  background: #ffffff !important;
   border-radius: 10px !important;
   border: 1px solid #e0e5ef !important;
   box-shadow: 0 1px 6px rgba(0,0,0,.06) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"] > div,
+[data-testid="stVerticalBlockBorderWrapper"] > div > div[data-testid="stVerticalBlock"] {
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* ── 연도/월 선택기 ── */
@@ -893,55 +909,54 @@ with dc3:
     )
 
 # ── 상세 탭 ──────────────────────────────────────────────────
-with st.container(border=True):
-    tab1, tab2 = st.tabs([f"📋 {mo_label(sel)} 상세 내역", "📊 거래처별 누계 (전 기간)"])
+tab1, tab2 = st.tabs([f"📋 {mo_label(sel)} 상세 내역", "📊 거래처별 누계 (전 기간)"])
 
-    with tab1:
-        fc1, fc2 = st.columns([4, 1])
-        kw     = fc1.text_input("거래처명 검색", placeholder="거래처명 검색",
-                                label_visibility="collapsed", key="kw1")
-        only_c = fc2.checkbox("청구만", key="oc1")
-        view   = sel_df.copy()
-        if kw:     view = view[view["판매처명"].str.contains(kw, na=False)]
-        if only_c: view = view[view["지체보상금"] > 0]
-        view = view.sort_values("지체보상금", ascending=False).reset_index(drop=True)
+with tab1:
+    fc1, fc2 = st.columns([4, 1])
+    kw     = fc1.text_input("거래처명 검색", placeholder="거래처명 검색",
+                            label_visibility="collapsed", key="kw1")
+    only_c = fc2.checkbox("청구만", key="oc1")
+    view   = sel_df.copy()
+    if kw:     view = view[view["판매처명"].str.contains(kw, na=False)]
+    if only_c: view = view[view["지체보상금"] > 0]
+    view = view.sort_values("지체보상금", ascending=False).reset_index(drop=True)
 
-        def _calc_str(r):
-            if r["청구 증분일수"] <= 0: return "—"
-            return (f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]}'
-                    f' = {int(r["지체보상금"]):,}원')
-        view["계산 근거"] = view.apply(_calc_str, axis=1)
+    def _calc_str(r):
+        if r["청구 증분일수"] <= 0: return "—"
+        return (f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]}'
+                f' = {int(r["지체보상금"]):,}원')
+    view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-        disp = view[["판매처명","현 미수금","유효기준회전일","현 회전일",
-                     "지연일수(누적)","청구 증분일수","요율","지체보상금","계산 근거","비고"]]
+    disp = view[["판매처명","현 미수금","유효기준회전일","현 회전일",
+                 "지연일수(누적)","청구 증분일수","요율","지체보상금","계산 근거","비고"]]
 
-        def _sty(r):
-            if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
-            return ["color:#ccc"] * len(r)
+    def _sty(r):
+        if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
+        return ["color:#ccc"] * len(r)
 
-        disp = disp.reset_index(drop=True)
-        disp.index = disp.index + 1
-        st.dataframe(
-            disp.style.apply(_sty, axis=1)
-                .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
-            use_container_width=True, height=430,
-        )
+    disp = disp.reset_index(drop=True)
+    disp.index = disp.index + 1
+    st.dataframe(
+        disp.style.apply(_sty, axis=1)
+            .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
+        use_container_width=True, height=430,
+    )
 
-    with tab2:
-        pv = result_df.pivot_table(
-            index=["판매처코드","판매처명"], columns="기준월",
-            values="지체보상금", aggfunc="sum", fill_value=0
-        ).reset_index()
-        pv.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv.columns]
-        pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
-        pv = pv.sort_values("합계", ascending=False).reset_index(drop=True)
-        pv.index = pv.index + 1
-        nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
-        def _heat(s):
-            mx = s.max() if s.max() else 1
-            return [f"background-color: rgba(255,100,50,{v/mx*0.6:.2f})" for v in s]
-        st.dataframe(
-            pv.style.format({c: "{:,.0f}" for c in nc})
-              .apply(_heat, subset=["합계"]),
-            use_container_width=True, height=430,
-        )
+with tab2:
+    pv = result_df.pivot_table(
+        index=["판매처코드","판매처명"], columns="기준월",
+        values="지체보상금", aggfunc="sum", fill_value=0
+    ).reset_index()
+    pv.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv.columns]
+    pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
+    pv = pv.sort_values("합계", ascending=False).reset_index(drop=True)
+    pv.index = pv.index + 1
+    nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
+    def _heat(s):
+        mx = s.max() if s.max() else 1
+        return [f"background-color: rgba(255,100,50,{v/mx*0.6:.2f})" for v in s]
+    st.dataframe(
+        pv.style.format({c: "{:,.0f}" for c in nc})
+          .apply(_heat, subset=["합계"]),
+        use_container_width=True, height=430,
+    )
