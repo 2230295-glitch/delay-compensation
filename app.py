@@ -630,8 +630,11 @@ with st.container(border=True):
         pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
         pv = pv.sort_values("합계", ascending=False)
         nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
+        def _heat(s):
+            mx = s.max() if s.max() else 1
+            return [f"background-color: rgba(255,100,50,{v/mx*0.6:.2f})" for v in s]
         st.dataframe(
             pv.style.format({c: "{:,.0f}" for c in nc})
-              .background_gradient(subset=["합계"], cmap="YlOrRd"),
+              .apply(_heat, subset=["합계"]),
             use_container_width=True, height=430,
         )
