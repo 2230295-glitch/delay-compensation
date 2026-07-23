@@ -599,7 +599,8 @@ sel_n      = int((sel_df["지체보상금"] > 0).sum())
 sel_cu     = sel_df[sel_df["지체보상금"] > 0]["판매처코드"].nunique()
 prev_total = int(prev_df["지체보상금"].sum()) if not prev_df.empty else 0
 
-ann_total = int(result_df["지체보상금"].sum())
+_sel_yr = sel.split("-")[0]
+ann_total = int(result_df[result_df["기준월"].str.startswith(_sel_yr)]["지체보상금"].sum())
 prev_n    = int((prev_df["지체보상금"] > 0).sum()) if not prev_df.empty else 0
 prev_cu   = prev_df[prev_df["지체보상금"] > 0]["판매처코드"].nunique() if not prev_df.empty else 0
 
@@ -637,9 +638,9 @@ st.markdown(f"""
     <div class="kpi-delta">{_delta(sel_cu, prev_cu, '개')}</div>
   </div>
   <div class="kpi-card c-gray">
-    <div class="kpi-lbl">연간 누계 지체보상금</div>
+    <div class="kpi-lbl">{_sel_yr}년 누계 지체보상금</div>
     <div class="kpi-num">{fmt_won(ann_total,short=True)}</div>
-    <div class="kpi-delta" style="color:#888">{mo_label(months_sorted[0])} ~ {mo_label(months_sorted[-1])}</div>
+    <div class="kpi-delta" style="color:#888">{_sel_yr}년 1월 ~ {mo_label(sel)}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
