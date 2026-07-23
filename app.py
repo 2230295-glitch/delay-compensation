@@ -611,8 +611,10 @@ with st.container(border=True):
             if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
             return ["color:#ccc"] * len(r)
 
+        disp = disp.reset_index(drop=True)
+        disp.index = disp.index + 1
         st.dataframe(
-            disp.reset_index(drop=True).style.apply(_sty, axis=1)
+            disp.style.apply(_sty, axis=1)
                 .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
             use_container_width=True, height=430,
         )
@@ -625,6 +627,7 @@ with st.container(border=True):
         pv.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv.columns]
         pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
         pv = pv.sort_values("합계", ascending=False).reset_index(drop=True)
+        pv.index = pv.index + 1
         nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
         def _heat(s):
             mx = s.max() if s.max() else 1
