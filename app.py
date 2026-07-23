@@ -764,7 +764,7 @@ with st.container(border=True):
             </div>"""
         st.markdown(f'<div style="padding:.2rem 0">{rows_html}</div>', unsafe_allow_html=True)
 
-# ── 트렌드 차트 2개 나란히 (전체 너비) ───────────────────────
+# ── 월별 + 누적 콤보 차트 (전체 너비) ────────────────────────
 sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
 all_12 = [f"{sel_yr_str}-{mo:02d}" for mo in range(1, 13)]
 x_labels = [f"{int(m.split('-')[1])}월" for m in all_12]
@@ -777,72 +777,61 @@ for v in bar_vals:
 bar_colors = ["#e8604c" if m == sel else "#f2a99a" for m in all_12]
 all_mo_max = max(bar_vals) if max(bar_vals) > 0 else 1
 cum_max = max(cum_vals) if max(cum_vals) > 0 else 1
+last_data_idx = max((i for i, v in enumerate(bar_vals) if v > 0), default=-1)
+cum_line = [cum_vals[i] if i <= last_data_idx else None for i in range(12)]
+cum_pts  = [cum_vals[i] if i <= last_data_idx and cum_vals[i] > 0 else None for i in range(12)]
 
-trend_l, trend_r = st.columns(2, gap="medium")
-
-with trend_l:
-    with st.container(border=True):
-        st.markdown(
-            f'<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">{sel_yr_str}년 월별 지체보상금 발생</div>'
-            '<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원</div>',
-            unsafe_allow_html=True)
-        fig2a = go.Figure(go.Bar(
-            x=x_labels, y=bar_vals,
-            marker_color=bar_colors, marker_line_width=0,
-            text=[f"{v:,.0f}" if v > 0 else "" for v in bar_vals],
-            textposition="outside", cliponaxis=False,
-            textfont=dict(size=11, color="#555"),
-            hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
-        ))
-        fig2a.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=5, b=5, l=50, r=20),
-            height=300,
-            yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-                       range=[0, all_mo_max * 1.45], tickfont=dict(size=10), title=None),
-            xaxis=dict(showgrid=False, tickfont=dict(size=11)),
-            font=dict(family=FONT), showlegend=False, bargap=0.35,
-        )
-        st.plotly_chart(fig2a, use_container_width=True, config={"displayModeBar": False})
-
-with trend_r:
-    with st.container(border=True):
-        st.markdown(
-            f'<div style="font-weight:800;font-size:.88rem;color:#1a2535;margin-bottom:.05rem">{sel_yr_str}년 누적 지체보상금</div>'
-            '<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원</div>',
-            unsafe_allow_html=True)
-        # 데이터 있는 마지막 달 이후는 None (미래 달 평탄 방지)
-        last_data_idx = max((i for i, v in enumerate(bar_vals) if v > 0), default=-1)
-        cum_line = [cum_vals[i] if i <= last_data_idx else None for i in range(12)]
-        cum_pts  = [cum_vals[i] if i <= last_data_idx and cum_vals[i] > 0 else None for i in range(12)]
-        fig2b = go.Figure()
-        fig2b.add_trace(go.Scatter(
-            x=x_labels, y=cum_line,
-            mode="lines",
-            line=dict(color="#e67e22", width=2.5),
-            fill="tozeroy", fillcolor="rgba(230,126,34,0.08)",
-            hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
-            showlegend=False,
-        ))
-        fig2b.add_trace(go.Scatter(
-            x=x_labels, y=cum_pts,
-            mode="markers+text",
-            marker=dict(size=7, color="#e67e22"),
-            text=[f"{v:,.0f}" if v else "" for v in cum_pts],
-            textposition="top center",
-            textfont=dict(size=11, color="#c0580a"),
-            hoverinfo="skip", showlegend=False,
-        ))
-        fig2b.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=5, b=5, l=50, r=20),
-            height=300,
-            yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-                       range=[0, cum_max * 1.35], tickfont=dict(size=10), title=None),
-            xaxis=dict(showgrid=False, tickfont=dict(size=11)),
-            font=dict(family=FONT),
-        )
-        st.plotly_chart(fig2b, use_container_width=True, config={"displayModeBar": False})
+with st.container(border=True):
+    st.markdown(
+        f'<div style="font-weight:800;font-size:.9rem;color:#1a2535;margin-bottom:.05rem">'
+        f'{sel_yr_str}년 월별 · 누적 지체보상금</div>'
+        f'<div style="font-size:.7rem;color:#aaa;margin-bottom:.5rem">단위: 만원 &nbsp;|&nbsp; '
+        f'<span style="color:#f2a99a">■</span> 월별 발생 &nbsp;'
+        f'<span style="color:#e67e22">─●</span> 누적</div>',
+        unsafe_allow_html=True)
+    fig_combo = go.Figure()
+    # 바: 월별
+    fig_combo.add_trace(go.Bar(
+        x=x_labels, y=bar_vals, name="월별 발생",
+        marker_color=bar_colors, marker_line_width=0,
+        text=[f"{v:,.0f}" if v > 0 else "" for v in bar_vals],
+        textposition="outside", cliponaxis=False,
+        textfont=dict(size=10, color="#888"),
+        hovertemplate="<b>%{x}</b> 월별 %{y:,.0f}만원<extra></extra>",
+        yaxis="y1",
+    ))
+    # 라인: 누적 (면적)
+    fig_combo.add_trace(go.Scatter(
+        x=x_labels, y=cum_line, name="누적",
+        mode="lines",
+        line=dict(color="#e67e22", width=2.5),
+        fill="tozeroy", fillcolor="rgba(230,126,34,0.06)",
+        hovertemplate="<b>%{x}</b> 누적 %{y:,.0f}만원<extra></extra>",
+        yaxis="y2", showlegend=False,
+    ))
+    # 점+라벨: 누적
+    fig_combo.add_trace(go.Scatter(
+        x=x_labels, y=cum_pts, name="누적",
+        mode="markers+text",
+        marker=dict(size=7, color="#e67e22", line=dict(color="#fff", width=1.5)),
+        text=[f"{v:,.0f}" if v else "" for v in cum_pts],
+        textposition="top center",
+        textfont=dict(size=10, color="#c0580a"),
+        hoverinfo="skip", yaxis="y2", showlegend=False,
+    ))
+    fig_combo.update_layout(
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(t=10, b=5, l=55, r=65),
+        height=310,
+        bargap=0.35,
+        yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
+                   range=[0, all_mo_max * 1.5], tickfont=dict(size=10), title=None, side="left"),
+        yaxis2=dict(overlaying="y", side="right", range=[0, cum_max * 1.3],
+                    tickformat=",d", tickfont=dict(size=10), showgrid=False, title=None),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11)),
+        font=dict(family=FONT), showlegend=False,
+    )
+    st.plotly_chart(fig_combo, use_container_width=True, config={"displayModeBar": False})
 
 # ── 다운로드 버튼 ────────────────────────────────────────────
 _, dc2, dc3, _ = st.columns([1, 2, 2, 1])
