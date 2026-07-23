@@ -677,29 +677,67 @@ with col_l:
 
 with col_r:
     with st.container(border=True):
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>연간 월별 추이</div>', unsafe_allow_html=True)
-        labels  = [mo_label(m) for m in months_sorted]
-        amounts = [int(mo_sum.get(m, 0)) for m in months_sorted]
-        colors  = ["#c0392b" if m == sel else "#4a90c4" for m in months_sorted]
-        all_mo_max = max(int(mo_sum.get(m, 0)) for m in months_sorted)
-        fig2 = go.Figure(go.Bar(
-            x=labels, y=amounts,
-            marker_color=colors, marker_line_width=0,
-            text=[fmt_won(v, short=True) if v > 0 else "0" for v in amounts],
-            textposition="outside",
-            cliponaxis=False,
+        sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
+        st.markdown(
+            f'<div style="font-weight:800;font-size:.92rem;color:#1a2535;margin-bottom:.15rem">'
+            f'지체보상금 월별 발생 추이</div>'
+            f'<div style="font-size:.72rem;color:#aaa;margin-bottom:.8rem">단위: 만원</div>',
+            unsafe_allow_html=True)
+
+        # 선택 연도 12개월 전체 표시
+        all_12 = [f"{sel_yr_str}-{mo:02d}" for mo in range(1, 13)]
+        x_labels = [f"{int(m.split('-')[1])}월" for m in all_12]
+        bar_vals  = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]  # 만원 단위
+        cum_vals  = []
+        run = 0
+        for v in bar_vals:
+            run += v
+            cum_vals.append(round(run, 1))
+
+        bar_colors = ["#e8604c" if m == sel else "#f2a99a" for m in all_12]
+        all_mo_max = max(bar_vals) if max(bar_vals) > 0 else 1
+
+        fig2 = go.Figure()
+        # 바: 월별 발생
+        fig2.add_trace(go.Bar(
+            x=x_labels, y=bar_vals,
+            name="월별 발생",
+            marker_color=bar_colors, marker_line_width=0,
+            text=[f"{v:,.0f}" if v > 0 else "" for v in bar_vals],
+            textposition="outside", cliponaxis=False,
             textfont=dict(size=10, color="#555"),
-            hovertemplate="<b>%{x}</b><br>%{text}<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
+            yaxis="y1",
         ))
+        # 라인: 누적
+        fig2.add_trace(go.Scatter(
+            x=x_labels, y=cum_vals,
+            name="누적",
+            mode="lines+markers+text",
+            line=dict(color="#e67e22", width=2.5),
+            marker=dict(size=7, color="#e67e22", symbol="circle"),
+            text=[f"{v:,.0f}" if v > 0 else "" for v in cum_vals],
+            textposition="top center",
+            textfont=dict(size=10, color="#c0580a"),
+            hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
+            yaxis="y2",
+        ))
+        y2_max = max(cum_vals) if max(cum_vals) > 0 else 1
         fig2.update_layout(
             plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=15, b=5, l=45, r=25),
-            height=280,
-            yaxis=dict(gridcolor="#f0f3f8", tickformat=",d", zeroline=False,
-                       range=[0, all_mo_max*1.3 if all_mo_max > 0 else 1]),
-            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+            margin=dict(t=10, b=5, l=50, r=55),
+            height=300,
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.08,
+                        font=dict(size=11, family=FONT)),
+            yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
+                       range=[0, all_mo_max*1.4], tickfont=dict(size=10),
+                       title=None),
+            yaxis2=dict(overlaying="y", side="right", range=[0, y2_max*1.35],
+                        showgrid=False, tickformat=",d", tickfont=dict(size=10),
+                        title=None),
+            xaxis=dict(showgrid=False, tickfont=dict(size=11)),
             font=dict(family=FONT),
-            showlegend=False, bargap=0.35,
+            bargap=0.35,
         )
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
