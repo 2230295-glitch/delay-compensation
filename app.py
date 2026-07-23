@@ -708,48 +708,40 @@ with _cc2:
 with _cc3:
     st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42"), unsafe_allow_html=True)
 
-# ── 거래처 차트 (전체 너비) ──────────────────────────────────
+# ── 청구 발생 거래처 랭킹 ─────────────────────────────────────
 with st.container(border=True):
     st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
-    charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
+    charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
     all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
-    CHART_H = 320
+
     if charge.empty:
-        fig = go.Figure()
-        fig.add_annotation(text="해당 월 청구 발생 없음", x=0.5, y=0.5,
-                           xref="paper", yref="paper", showarrow=False,
-                           font=dict(size=14, color="#ccc", family=FONT))
+        st.markdown('<div style="text-align:center;color:#ccc;padding:3rem 0;font-size:.9rem">해당 월 청구 발생 없음</div>', unsafe_allow_html=True)
     else:
-        mean_v = charge["지체보상금"].mean()
-        fig = go.Figure(go.Bar(
-            x=charge["지체보상금"].values[::-1],
-            y=charge["판매처명"].values[::-1],
-            orientation="h",
-            marker_color=["#c0392b" if v >= mean_v else "#2f80c0"
-                          for v in charge["지체보상금"].values[::-1]],
-            marker_line_width=0,
-            text=[fmt_won(v, short=True) for v in charge["지체보상금"].values[::-1]],
-            textposition="outside",
-            cliponaxis=False,
-            textfont=dict(size=11, color="#444"),
-            hovertemplate="<b>%{y}</b><br>지체보상금: %{text}<extra></extra>",
-        ))
-    n_bars = max(len(charge), 1)
-    bar_px = 48  # 막대 두께 고정 (px)
-    bargap = max(0.05, 1 - (bar_px * n_bars) / CHART_H)
-    fig.update_layout(
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=5, b=5, l=180, r=110),
-        height=CHART_H,
-        xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
-                   zeroline=False, showline=False,
-                   range=[0, all_max * 1.35] if not charge.empty else [0, 1]),
-        yaxis=dict(tickfont=dict(size=12), showgrid=False),
-        font=dict(family=FONT),
-        showlegend=False,
-        bargap=bargap,
-    )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        rank_colors = ["#c0392b","#e74c3c","#e67e22","#d4ac0d","#2980b9","#2471a3","#1a5276","#196f3d","#1e8449","#117a65"]
+        rows_html = ""
+        for i, row in charge.iterrows():
+            v = int(row["지체보상금"])
+            pct = min(v / all_max * 100, 100)
+            color = rank_colors[i] if i < len(rank_colors) else "#888"
+            rank_badge = (
+                f'<span style="background:{color};color:#fff;font-size:.72rem;font-weight:800;'
+                f'width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;'
+                f'align-items:center;justify-content:center;flex-shrink:0">{i+1}</span>'
+            )
+            rows_html += f"""
+            <div style="display:grid;grid-template-columns:2rem 1fr 5rem;align-items:center;
+                        gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f5f5f5">
+              {rank_badge}
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">{row['판매처명']}</div>
+                <div style="background:#f0f2f5;border-radius:4px;height:7px;overflow:hidden">
+                  <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px;
+                              transition:width .3s"></div>
+                </div>
+              </div>
+              <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v,short=True)}</div>
+            </div>"""
+        st.markdown(f'<div style="padding:.2rem 0">{rows_html}</div>', unsafe_allow_html=True)
 
 # ── 트렌드 차트 2개 나란히 (전체 너비) ───────────────────────
 sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
