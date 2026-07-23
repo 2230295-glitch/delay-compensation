@@ -429,10 +429,6 @@ else:
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
 
-if contract_map:
-    st.success(f"계약서 반영 완료 — 지체 해당 {n_yes}개 / 미해당 {n_no}개 거래처 제외")
-else:
-    st.warning("계약서 미적용 — 전체 1/1,000 기본 요율 적용")
 
 months_sorted = sorted(result_df["기준월"].unique())
 mo_sum = result_df.groupby("기준월")["지체보상금"].sum()
@@ -616,7 +612,7 @@ with st.container(border=True):
             return ["color:#ccc"] * len(r)
 
         st.dataframe(
-            disp.style.apply(_sty, axis=1)
+            disp.reset_index(drop=True).style.apply(_sty, axis=1)
                 .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
             use_container_width=True, height=430,
         )
@@ -628,7 +624,7 @@ with st.container(border=True):
         ).reset_index()
         pv.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv.columns]
         pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
-        pv = pv.sort_values("합계", ascending=False)
+        pv = pv.sort_values("합계", ascending=False).reset_index(drop=True)
         nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
         def _heat(s):
             mx = s.max() if s.max() else 1
