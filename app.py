@@ -712,11 +712,15 @@ with _cc3:
 with st.container(border=True):
     st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>', unsafe_allow_html=True)
     charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
+    all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
+    CHART_H = 320
     if charge.empty:
-        st.markdown('<p style="text-align:center;color:#bbb;padding:2.5rem 0;font-size:.85rem">해당 월 청구 발생 없음</p>', unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_annotation(text="해당 월 청구 발생 없음", x=0.5, y=0.5,
+                           xref="paper", yref="paper", showarrow=False,
+                           font=dict(size=14, color="#ccc", family=FONT))
     else:
         mean_v = charge["지체보상금"].mean()
-        all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
         fig = go.Figure(go.Bar(
             x=charge["지체보상금"].values[::-1],
             y=charge["판매처명"].values[::-1],
@@ -730,17 +734,18 @@ with st.container(border=True):
             textfont=dict(size=11, color="#444"),
             hovertemplate="<b>%{y}</b><br>지체보상금: %{text}<extra></extra>",
         ))
-        fig.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=5, b=5, l=160, r=100),
-            height=320,
-            xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
-                       zeroline=False, showline=False, range=[0, all_max*1.35]),
-            yaxis=dict(tickfont=dict(size=12), showgrid=False),
-            font=dict(family=FONT),
-            showlegend=False,
-        )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    fig.update_layout(
+        plot_bgcolor="white", paper_bgcolor="white",
+        margin=dict(t=5, b=5, l=180, r=110),
+        height=CHART_H,
+        xaxis=dict(tickformat=",d", gridcolor="#f0f3f8",
+                   zeroline=False, showline=False,
+                   range=[0, all_max * 1.35] if not charge.empty else [0, 1]),
+        yaxis=dict(tickfont=dict(size=12), showgrid=False),
+        font=dict(family=FONT),
+        showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 # ── 트렌드 차트 2개 나란히 (전체 너비) ───────────────────────
 sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
