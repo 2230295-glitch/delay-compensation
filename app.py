@@ -760,6 +760,8 @@ with _cc2:
 with _cc3:
     st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42", _card_min_h), unsafe_allow_html=True)
 
+st.markdown('<div style="margin-bottom:1.2rem"></div>', unsafe_allow_html=True)
+
 # ── 청구 발생 거래처 랭킹 ─────────────────────────────────────
 charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
 all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
