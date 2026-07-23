@@ -346,7 +346,7 @@ def load_monthly(file_bytes, think_codes=None):
                  "잔고":r["_잔고"],"현회전일":r["_일수"],
                  "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
                  "사업부":str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
-                 "담당자":str(r.get("담당자","")).strip() if "담당자" in r.index else "",
+                 "담당자":str(r.get("담당자명","")).strip() if "담당자명" in r.index else "",
                  } for _, r in grp.iterrows()]
         months.append({"yr":int(yr),"mo":int(mo),"data":pd.DataFrame(rows)})
     months.sort(key=lambda x: (x["yr"], x["mo"]))
@@ -790,46 +790,53 @@ with st.container(border=True):
         f'<span style="color:#e67e22">─●</span> 누적</div>',
         unsafe_allow_html=True)
     fig_combo = go.Figure()
+    # 누적 면적 (뒤에 깔리게 먼저)
+    fig_combo.add_trace(go.Scatter(
+        x=x_labels, y=cum_line, name="_fill",
+        mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
+        fill="tozeroy", fillcolor="rgba(232,146,74,0.10)",
+        hoverinfo="skip", yaxis="y2", showlegend=False,
+    ))
     # 바: 월별
     fig_combo.add_trace(go.Bar(
         x=x_labels, y=bar_vals, name="월별 발생",
         marker_color=bar_colors, marker_line_width=0,
-        text=[f"{v:,.0f}" if v > 0 else "" for v in bar_vals],
+        text=[f"{v:,.0f}만" if v > 0 else "" for v in bar_vals],
         textposition="outside", cliponaxis=False,
         textfont=dict(size=10, color="#888"),
         hovertemplate="<b>%{x}</b> 월별 %{y:,.0f}만원<extra></extra>",
         yaxis="y1",
     ))
-    # 라인: 누적 (면적)
+    # 누적 라인+점+라벨
     fig_combo.add_trace(go.Scatter(
-        x=x_labels, y=cum_line, name="누적",
-        mode="lines",
-        line=dict(color="#e67e22", width=2.5),
-        fill="tozeroy", fillcolor="rgba(230,126,34,0.06)",
-        hovertemplate="<b>%{x}</b> 누적 %{y:,.0f}만원<extra></extra>",
-        yaxis="y2", showlegend=False,
-    ))
-    # 점+라벨: 누적
-    fig_combo.add_trace(go.Scatter(
-        x=x_labels, y=cum_pts, name="누적",
-        mode="markers+text",
-        marker=dict(size=7, color="#e67e22", line=dict(color="#fff", width=1.5)),
-        text=[f"{v:,.0f}" if v else "" for v in cum_pts],
+        x=x_labels, y=cum_line, name="누적 지체보상금",
+        mode="lines+markers+text",
+        line=dict(color="#e8924a", width=2.5),
+        marker=dict(size=7, color="#e8924a", line=dict(color="#fff", width=2)),
+        text=[f"{v:,.0f}만" if v else "" for v in cum_pts],
         textposition="top center",
-        textfont=dict(size=10, color="#c0580a"),
-        hoverinfo="skip", yaxis="y2", showlegend=False,
+        textfont=dict(size=10, color="#c07030"),
+        hovertemplate="<b>%{x}</b> 누적 %{y:,.0f}만원<extra></extra>",
+        yaxis="y2",
     ))
     fig_combo.update_layout(
         plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(t=10, b=5, l=55, r=65),
-        height=310,
-        bargap=0.35,
+        margin=dict(t=45, b=10, l=55, r=65),
+        height=350,
+        bargap=0.4,
+        legend=dict(
+            orientation="h", x=0.5, xanchor="center", y=1.07,
+            font=dict(size=11, family=FONT),
+            bgcolor="rgba(0,0,0,0)",
+        ),
         yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-                   range=[0, all_mo_max * 1.5], tickfont=dict(size=10), title=None, side="left"),
+                   range=[0, all_mo_max * 1.55], tickfont=dict(size=10),
+                   title=None, showline=False),
         yaxis2=dict(overlaying="y", side="right", range=[0, cum_max * 1.3],
-                    tickformat=",d", tickfont=dict(size=10), showgrid=False, title=None),
-        xaxis=dict(showgrid=False, tickfont=dict(size=11)),
-        font=dict(family=FONT), showlegend=False,
+                    tickformat=",d", tickfont=dict(size=10),
+                    showgrid=False, title=None, showline=False),
+        xaxis=dict(showgrid=False, tickfont=dict(size=11), showline=False, zeroline=False),
+        font=dict(family=FONT),
     )
     st.plotly_chart(fig_combo, use_container_width=True, config={"displayModeBar": False})
 
