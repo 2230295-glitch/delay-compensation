@@ -720,7 +720,7 @@ for _code in set(_prev_map) | set(_curr_map):
 for _lst in (_신규, _추가, _수금):
     _lst.sort(key=lambda x: -x["금액"])
 
-def _cmp_card(title, lst, accent, sign, amt_color):
+def _cmp_card(title, lst, accent, sign, amt_color, min_h="auto"):
     total = sum(x["금액"] for x in lst)
     rows = ""
     for i, x in enumerate(lst[:5]):
@@ -742,7 +742,7 @@ def _cmp_card(title, lst, accent, sign, amt_color):
         rows = '<div style="color:#ccc;font-size:.82rem;padding:1.8rem 0;text-align:center">해당 없음</div>'
     return (
         f'<div style="background:#fff;border-radius:10px;border-top:3px solid {accent};'
-        f'box-shadow:0 1px 8px rgba(0,0,0,.07);padding:1rem 1.15rem 1.1rem">'
+        f'box-shadow:0 1px 8px rgba(0,0,0,.07);padding:1rem 1.15rem 1.1rem;min-height:{min_h}">'
         f'<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.65rem">'
         f'<span style="font-size:.88rem;font-weight:800;color:{accent}">{title}</span>'
         f'<span style="font-size:.76rem;color:#aaa">{len(lst)}건 &nbsp;·&nbsp; 총 <b style="color:#555">{fmt_won(total,short=True)}</b></span>'
@@ -750,13 +750,15 @@ def _cmp_card(title, lst, accent, sign, amt_color):
         f'{rows}</div>'
     )
 
+_max_n = max(min(len(_신규), 5), min(len(_추가), 5), min(len(_수금), 5))
+_card_min_h = f"{72 + _max_n * 44}px"
 _cc1, _cc2, _cc3 = st.columns(3, gap="medium")
 with _cc1:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규, "#e74c3c", "+", "#c0392b"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규, "#e74c3c", "+", "#c0392b", _card_min_h), unsafe_allow_html=True)
 with _cc2:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가, "#e67e22", "+", "#c96a10"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가, "#e67e22", "+", "#c96a10", _card_min_h), unsafe_allow_html=True)
 with _cc3:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42"), unsafe_allow_html=True)
+    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42", _card_min_h), unsafe_allow_html=True)
 
 # ── 청구 발생 거래처 랭킹 ─────────────────────────────────────
 charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
