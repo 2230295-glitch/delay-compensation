@@ -555,21 +555,6 @@ def _show_guide():
 </div>""", unsafe_allow_html=True)
 
 
-def _docx_font(run, size=10, bold=False, color=None, name='맑은 고딕'):
-    run.font.name = name
-    run.font.size = _Pt(size)
-    run.font.bold = bold
-    if color:
-        run.font.color.rgb = _RGB.from_string(color)
-    rPr = run._r.get_or_add_rPr()
-    for tag in list(rPr):
-        if tag.tag == _dqn('w:rFonts'):
-            rPr.remove(tag)
-    rf = _dxml('w:rFonts')
-    rf.set(_dqn('w:ascii'), name); rf.set(_dqn('w:eastAsia'), name); rf.set(_dqn('w:hAnsi'), name)
-    rPr.insert(0, rf)
-
-
 def _docx_shading(cell, fill_hex):
     tcPr = cell._tc.get_or_add_tcPr()
     for tag in list(tcPr):
@@ -580,139 +565,216 @@ def _docx_shading(cell, fill_hex):
     tcPr.append(shd)
 
 
-def _dcell(cell, text, size=10, bold=False, color=None, align=None, fill=None):
-    para = cell.paragraphs[0]
-    run = para.add_run(str(text))
-    _docx_font(run, size=size, bold=bold, color=color)
-    if align is not None:
-        para.alignment = align
-    if fill:
-        _docx_shading(cell, fill)
+def _공문_doc_setup(doc):
+    """잔고확인서와 동일한 여백 설정"""
+    for sec in doc.sections:
+        sec.top_margin = _Cm(1.8); sec.bottom_margin = _Cm(1.5)
+        sec.left_margin = _Cm(2.0); sec.right_margin = _Cm(2.0)
 
+    def _rf(run, name='맑은 고딕'):
+        rPr = run._r.get_or_add_rPr()
+        for t in list(rPr):
+            if t.tag == _dqn('w:rFonts'): rPr.remove(t)
+        rf = _dxml('w:rFonts')
+        rf.set(_dqn('w:ascii'), name); rf.set(_dqn('w:eastAsia'), name); rf.set(_dqn('w:hAnsi'), name)
+        rPr.insert(0, rf)
 
-def _docx_base(doc):
-    sec = doc.sections[0]
-    sec.top_margin = _Cm(2.5); sec.bottom_margin = _Cm(2.5)
-    sec.left_margin = _Cm(3);  sec.right_margin = _Cm(3)
+    def _r(para, text, bold=False, size=10, color=None, name='맑은 고딕'):
+        run = para.add_run(text)
+        run.bold = bold; run.font.size = _Pt(size); run.font.name = name
+        if color: run.font.color.rgb = _RGB.from_string(color)
+        _rf(run, name); return run
+
+    def _p(text='', bold=False, size=10, align=_WDA.LEFT, sa=2, color=None):
+        p = doc.add_paragraph(); p.alignment = align
+        p.paragraph_format.space_after = _Pt(sa); p.paragraph_format.space_before = _Pt(0)
+        if text: _r(p, text, bold=bold, size=size, color=color)
+        return p
+
+    def _bline(side='bottom', sa=6):
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = _Pt(sa); p.paragraph_format.space_before = _Pt(0)
+        pPr = p._p.get_or_add_pPr()
+        pBdr = _dxml('w:pBdr')
+        bdr = _dxml(f'w:{side}')
+        bdr.set(_dqn('w:val'), 'single'); bdr.set(_dqn('w:sz'), '18')
+        bdr.set(_dqn('w:space'), '1'); bdr.set(_dqn('w:color'), '1A2A6C')
+        pBdr.append(bdr); pPr.append(pBdr)
+
+    def _tc(cell, text, bold=False, size=9.5, color=None, fill=None, align=_WDA.LEFT):
+        para = cell.paragraphs[0]
+        run = para.add_run(str(text))
+        run.bold = bold; run.font.size = _Pt(size); run.font.name = '맑은 고딕'
+        if color: run.font.color.rgb = _RGB.from_string(color)
+        _rf(run); para.alignment = align
+        if fill: _docx_shading(cell, fill)
+
+    def _footer(sig_addr="서울시 강남구 봉은사로 114길 12"):
+        _bline('top', sa=4)
+        _p('DAEWOONG PHARMACEUTICAL CO., LTD.', bold=True, size=10, align=_WDA.CENTER, sa=0)
+        _p('대웅제약 주식회사', size=8.5, align=_WDA.CENTER, sa=0)
+
+    def _sig(sig_addr="서울시 강남구 봉은사로 114길 12"):
+        p = _p(sa=2, align=_WDA.RIGHT)
+        _r(p, f'{sig_addr}\n주 식 회 사  대 웅 제 약\n대 표 이 사   이 창 재', size=10)
+
+    def _letterhead(판매처명, 제목, doc_no_suffix):
+        from datetime import date as _d
+        today = _d.today()
+        # 레터헤드
+        p_lh = _p(sa=2)
+        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=22)
+        _bline('bottom', sa=6)
+        # 문서번호 / 날짜
+        th = doc.add_table(rows=1, cols=2)
+        for cell in th.rows[0].cells:
+            cell._tc.get_or_add_tcPr()  # ensure tcPr exists
+        _tc(th.rows[0].cells[0], f'문서번호 : {doc_no_suffix}')
+        _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
+        _p(sa=4)
+        # 수신/제목
+        p = _p(sa=2)
+        _r(p, '수  신', bold=True, size=10.5)
+        _r(p, f'  :  {판매처명} 귀중', size=10.5)
+        p = _p(sa=6)
+        _r(p, '제  목', bold=True, size=10.5)
+        _r(p, f'  :  {제목}', bold=True, size=10.5)
+        _bline('top', sa=8)
+        return today
+
+    return _r, _p, _bline, _tc, _sig, _footer, _letterhead
 
 
 def make_공문_word(row):
-    if not _HAS_DOCX:
-        raise ImportError("pip install python-docx 후 재시작 필요")
+    if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
     doc = _DocxDoc()
-    _docx_base(doc)
+    _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
 
-    p = doc.add_paragraph(); p.alignment = _WDA.CENTER
-    _docx_font(p.add_run('지체보상금 청구서'), size=18, bold=True)
+    판매처명 = str(row.get("판매처명", ""))
+    기준월   = str(row.get("기준월", ""))
+    today = _letterhead(판매처명, "지체보상금 청구의 건",
+                        f"지체-{기준월.replace('-','')}-{판매처명[:4]}")
 
-    p2 = doc.add_paragraph(); p2.alignment = _WDA.CENTER
-    _docx_font(p2.add_run(f'기준월: {row.get("기준월", "")}'), size=10, color='888888')
+    # 본문 1
+    _p('1.', bold=True, size=10, sa=3)
+    p = _p(sa=6)
+    _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
+    _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
+    _r(p, 기준월, bold=True, size=10)
+    _r(p, ' 기준 지체보상금이 아래와 같이 발생하였기에 청구드립니다.', size=10)
 
-    doc.add_paragraph()
-
-    tbl = doc.add_table(rows=3, cols=2); tbl.style = 'Table Grid'
-    for i, (k, v) in enumerate([("수  신", row.get("판매처명","")),
-                                  ("사업자번호", row.get("사업자번호","")),
-                                  ("계약유형", row.get("계약유형",""))]):
-        _dcell(tbl.rows[i].cells[0], k, bold=True, color='FFFFFF', fill='18293F')
-        _dcell(tbl.rows[i].cells[1], v)
-    for r_obj in tbl.rows:
-        r_obj.cells[0].width = _Cm(4); r_obj.cells[1].width = _Cm(11)
-
-    doc.add_paragraph()
-    _docx_font(doc.add_paragraph().add_run('▶ 청구 내역'), size=11, bold=True)
-
+    # 청구 내역 표
+    _p('─ 청구 내역', bold=True, size=10, sa=3)
     details = [
-        ("현 미수금 잔액",   f"{int(row['현 미수금']):,}원"),
-        ("유효 기준회전일",  f"{int(row['유효기준회전일'])}일"),
-        ("현 회전일",        f"{int(row['현 회전일'])}일"),
-        ("지연일수 (누적)",  f"{int(row['지연일수(누적)'])}일"),
-        ("청구 증분일수",    f"{int(row['청구 증분일수'])}일"),
-        ("요율",             str(row["요율"])),
-        ("지체보상금",       f"{int(row['지체보상금']):,}원"),
-        ("계산 근거",        str(row.get("계산 근거", ""))),
+        ('· 기준월',         기준월),
+        ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
+        ('· 유효 기준회전일', f'{int(row["유효기준회전일"])}일'),
+        ('· 현 회전일',       f'{int(row["현 회전일"])}일'),
+        ('· 지연일수 (누적)', f'{int(row["지연일수(누적)"])}일'),
+        ('· 청구 증분일수',   f'{int(row["청구 증분일수"])}일'),
+        ('· 요율',           str(row["요율"])),
+        ('· 지체보상금',     f'{int(row["지체보상금"]):,} 원'),
+        ('· 계산 근거',      str(row.get("계산 근거", ""))),
     ]
-    tbl2 = doc.add_table(rows=len(details)+1, cols=2); tbl2.style = 'Table Grid'
-    _dcell(tbl2.rows[0].cells[0], "항목", bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
-    _dcell(tbl2.rows[0].cells[1], "내역", bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
-    for i, (k, v) in enumerate(details, start=1):
-        bg = 'F5F7FA' if i % 2 == 0 else None
-        _dcell(tbl2.rows[i].cells[0], k, fill=bg)
-        _dcell(tbl2.rows[i].cells[1], v, fill=bg)
-    for r_obj in tbl2.rows:
-        r_obj.cells[0].width = _Cm(5); r_obj.cells[1].width = _Cm(10)
+    tbl = doc.add_table(rows=len(details), cols=2); tbl.style = 'Table Grid'
+    for i, (lbl, val) in enumerate(details):
+        _tc(tbl.rows[i].cells[0], lbl, bold=True, fill='EEEEF5')
+        _tc(tbl.rows[i].cells[1], val, color='C0392B' if '지체보상금' in lbl else None)
+    for r_obj in tbl.rows:
+        r_obj.cells[0].width = _Cm(5.5); r_obj.cells[1].width = _Cm(9.5)
 
-    doc.add_paragraph()
-    _docx_font(doc.add_paragraph().add_run("※ 전표처리 전 반드시 거래처 회신 수령 완료 확인"),
-               size=9, color='C0392B')
+    # 참고 (사업자번호/계약유형)
+    사업자번호 = str(row.get("사업자번호", "")).strip()
+    계약유형   = str(row.get("계약유형",   "")).strip()
+    parts = [x for x in [
+        f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
+        f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
+    ] if x]
+    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=4, color='666666')
+    else:     _p(sa=4)
+
+    # 본문 2
+    _p('2.', bold=True, size=10, sa=3)
+    p = _p(sa=12)
+    _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
+    _r(p, '______년  ______월  ______일', size=10)
+    _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
+
+    _p('거래처명 :                                                                                   (인)', size=10, sa=14)
+    _sig()
+    _footer()
 
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 
 def make_공문_word_cumulative(vendor_df):
-    if not _HAS_DOCX:
-        raise ImportError("pip install python-docx 후 재시작 필요")
+    if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
     doc = _DocxDoc()
-    _docx_base(doc)
+    _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
 
-    first = vendor_df.sort_values("기준월").iloc[0]
-    months = sorted(vendor_df["기준월"].unique())
-    period = f"{months[0]} ~ {months[-1]}"
+    first   = vendor_df.sort_values("기준월").iloc[0]
+    months  = sorted(vendor_df["기준월"].unique())
+    period  = f"{months[0]} ~ {months[-1]}"
+    판매처명 = str(first.get("판매처명", ""))
+    total   = int(vendor_df["지체보상금"].sum())
 
-    p = doc.add_paragraph(); p.alignment = _WDA.CENTER
-    _docx_font(p.add_run('지체보상금 청구서'), size=18, bold=True)
+    from datetime import date as _d
+    today = _d.today()
+    _letterhead(판매처명, "지체보상금 청구의 건 (전체 기간)",
+                f"지체-{today.strftime('%Y')}전체-{판매처명[:4]}")
 
-    p2 = doc.add_paragraph(); p2.alignment = _WDA.CENTER
-    _docx_font(p2.add_run(f'청구 기간: {period}'), size=10, color='888888')
+    # 본문 1
+    _p('1.', bold=True, size=10, sa=3)
+    p = _p(sa=6)
+    _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
+    _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
+    _r(p, period, bold=True, size=10)
+    _r(p, ' 기간 동안 발생한 지체보상금 합계를 아래와 같이 청구드립니다.', size=10)
 
-    doc.add_paragraph()
-
-    tbl = doc.add_table(rows=3, cols=2); tbl.style = 'Table Grid'
-    for i, (k, v) in enumerate([("수  신", str(first.get("판매처명",""))),
-                                  ("사업자번호", str(first.get("사업자번호",""))),
-                                  ("계약유형",  str(first.get("계약유형","")))]):
-        _dcell(tbl.rows[i].cells[0], k, bold=True, color='FFFFFF', fill='18293F')
-        _dcell(tbl.rows[i].cells[1], v)
-    for r_obj in tbl.rows:
-        r_obj.cells[0].width = _Cm(4); r_obj.cells[1].width = _Cm(11)
-
-    doc.add_paragraph()
-    _docx_font(doc.add_paragraph().add_run('▶ 월별 청구 내역'), size=11, bold=True)
-
+    # 월별 내역 표
+    _p('─ 월별 청구 내역', bold=True, size=10, sa=3)
     hdrs = ["기준월", "현 미수금", "기준회전일", "현 회전일", "청구 증분일수", "요율", "지체보상금"]
     sorted_df = vendor_df.sort_values("기준월")
     n = len(sorted_df)
-    tbl2 = doc.add_table(rows=n+2, cols=len(hdrs)); tbl2.style = 'Table Grid'
+    tbl = doc.add_table(rows=n + 2, cols=len(hdrs)); tbl.style = 'Table Grid'
 
     for ci, h in enumerate(hdrs):
-        _dcell(tbl2.rows[0].cells[ci], h, size=9, bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
+        _tc(tbl.rows[0].cells[ci], h, bold=True, color='FFFFFF', fill='1A2A6C', align=_WDA.CENTER)
 
     for ri, (_, r) in enumerate(sorted_df.iterrows(), start=1):
-        bg = 'F5F7FA' if ri % 2 == 0 else None
-        for ci, v in enumerate([r["기준월"], f"{int(r['현 미수금']):,}", f"{int(r['유효기준회전일'])}",
-                                 f"{int(r['현 회전일'])}", f"{int(r['청구 증분일수'])}",
-                                 r["요율"], f"{int(r['지체보상금']):,}"]):
-            _dcell(tbl2.rows[ri].cells[ci], v, size=9, fill=bg, align=_WDA.CENTER)
+        bg = 'F0F0F8' if ri % 2 == 0 else None
+        vals = [r["기준월"], f'{int(r["현 미수금"]):,}', f'{int(r["유효기준회전일"])}',
+                f'{int(r["현 회전일"])}', f'{int(r["청구 증분일수"])}', r["요율"], f'{int(r["지체보상금"]):,}']
+        for ci, v in enumerate(vals):
+            _tc(tbl.rows[ri].cells[ci], v, size=9.5, fill=bg, align=_WDA.CENTER)
 
-    total = int(vendor_df["지체보상금"].sum())
-    last = tbl2.rows[n+1]
-    _dcell(last.cells[0], "합  계", bold=True, fill='EBF5FB', align=_WDA.CENTER)
-    for ci in range(1, len(hdrs)-1):
-        _docx_shading(last.cells[ci], 'EBF5FB')
-    _dcell(last.cells[-1], f"{total:,}", bold=True, color='C0392B', fill='EBF5FB', align=_WDA.CENTER)
+    # 합계 행
+    last = tbl.rows[n + 1]
+    _tc(last.cells[0], "합  계", bold=True, fill='E8EDF5', align=_WDA.CENTER)
+    for ci in range(1, len(hdrs) - 1):
+        _docx_shading(last.cells[ci], 'E8EDF5')
+    _tc(last.cells[-1], f'{total:,}', bold=True, color='C0392B', fill='E8EDF5', align=_WDA.CENTER)
 
-    widths = [_Cm(2), _Cm(2.8), _Cm(1.8), _Cm(1.8), _Cm(2), _Cm(1.5), _Cm(3.1)]
-    for r_obj in tbl2.rows:
-        for ci, w in enumerate(widths):
-            r_obj.cells[ci].width = w
+    widths = [_Cm(2.2), _Cm(3.0), _Cm(1.8), _Cm(1.8), _Cm(2.2), _Cm(1.5), _Cm(2.5)]
+    for r_obj in tbl.rows:
+        for ci, w in enumerate(widths): r_obj.cells[ci].width = w
 
-    doc.add_paragraph()
-    p_tot = doc.add_paragraph(); p_tot.alignment = _WDA.RIGHT
-    _docx_font(p_tot.add_run(f'▶ 합계 청구금액: {total:,}원'), size=13, bold=True, color='C0392B')
+    # 합계 강조
+    _p(sa=4)
+    p_tot = _p(sa=10, align=_WDA.RIGHT)
+    _r(p_tot, '※ 합계 청구금액 : ', bold=True, size=11)
+    _r(p_tot, f'{total:,} 원', bold=True, size=13, color='C0392B')
 
-    doc.add_paragraph()
-    _docx_font(doc.add_paragraph().add_run("※ 전표처리 전 반드시 거래처 회신 수령 완료 확인"),
-               size=9, color='C0392B')
+    # 본문 2
+    _p('2.', bold=True, size=10, sa=3)
+    p = _p(sa=12)
+    _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
+    _r(p, '______년  ______월  ______일', size=10)
+    _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
+
+    _p('거래처명 :                                                                                   (인)', size=10, sa=14)
+    _sig()
+    _footer()
 
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
