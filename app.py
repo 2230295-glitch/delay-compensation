@@ -3,6 +3,16 @@
 실행: streamlit run app.py
 """
 import io, re, calendar, zipfile
+
+try:
+    from docx import Document as _DocxDoc
+    from docx.shared import Pt as _Pt, Cm as _Cm, RGBColor as _RGB
+    from docx.enum.text import WD_ALIGN_PARAGRAPH as _WDA
+    from docx.oxml.ns import qn as _dqn
+    from docx.oxml import OxmlElement as _dxml
+    _HAS_DOCX = True
+except ImportError:
+    _HAS_DOCX = False
 from datetime import date
 from pathlib import Path
 
@@ -545,36 +555,72 @@ def _show_guide():
 </div>""", unsafe_allow_html=True)
 
 
-def make_공문_excel(row):
-    wb = openpyxl.Workbook()
-    ws = wb.active; ws.title = "지체보상금청구서"
-    HDR = PatternFill("solid", fgColor="18293F")
-    STRIPE = PatternFill("solid", fgColor="F5F7FA")
+def _docx_font(run, size=10, bold=False, color=None, name='맑은 고딕'):
+    run.font.name = name
+    run.font.size = _Pt(size)
+    run.font.bold = bold
+    if color:
+        run.font.color.rgb = _RGB.from_string(color)
+    rPr = run._r.get_or_add_rPr()
+    for tag in list(rPr):
+        if tag.tag == _dqn('w:rFonts'):
+            rPr.remove(tag)
+    rf = _dxml('w:rFonts')
+    rf.set(_dqn('w:ascii'), name); rf.set(_dqn('w:eastAsia'), name); rf.set(_dqn('w:hAnsi'), name)
+    rPr.insert(0, rf)
 
-    ws.merge_cells("A1:D1")
-    ws["A1"] = "지체보상금 청구서"
-    ws["A1"].font = Font(bold=True, size=16, name="맑은 고딕")
-    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 42
 
-    ws.merge_cells("A2:D2")
-    ws["A2"] = f"기준월: {row.get('기준월', '')}"
-    ws["A2"].font = Font(size=10, color="888888", name="맑은 고딕")
-    ws["A2"].alignment = Alignment(horizontal="center")
+def _docx_shading(cell, fill_hex):
+    tcPr = cell._tc.get_or_add_tcPr()
+    for tag in list(tcPr):
+        if tag.tag == _dqn('w:shd'):
+            tcPr.remove(tag)
+    shd = _dxml('w:shd')
+    shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), fill_hex)
+    tcPr.append(shd)
 
-    ws["A4"] = "수  신"; ws["B4"] = row.get("판매처명", "")
-    ws["A5"] = "사업자번호"; ws["B5"] = row.get("사업자번호", "")
-    ws["A6"] = "계약유형"; ws["B6"] = row.get("계약유형", "")
-    for r in range(4, 7):
-        ws[f"A{r}"].font = Font(bold=True, name="맑은 고딕", size=10)
-        ws[f"B{r}"].font = Font(name="맑은 고딕", size=10)
 
-    # 상세 테이블 헤더
-    for ci, h in enumerate(["항목", "내역"], start=1):
-        c = ws.cell(8, ci, h)
-        c.font = Font(bold=True, color="FFFFFF", name="맑은 고딕", size=10)
-        c.fill = HDR; c.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[8].height = 22
+def _dcell(cell, text, size=10, bold=False, color=None, align=None, fill=None):
+    para = cell.paragraphs[0]
+    run = para.add_run(str(text))
+    _docx_font(run, size=size, bold=bold, color=color)
+    if align is not None:
+        para.alignment = align
+    if fill:
+        _docx_shading(cell, fill)
+
+
+def _docx_base(doc):
+    sec = doc.sections[0]
+    sec.top_margin = _Cm(2.5); sec.bottom_margin = _Cm(2.5)
+    sec.left_margin = _Cm(3);  sec.right_margin = _Cm(3)
+
+
+def make_공문_word(row):
+    if not _HAS_DOCX:
+        raise ImportError("pip install python-docx 후 재시작 필요")
+    doc = _DocxDoc()
+    _docx_base(doc)
+
+    p = doc.add_paragraph(); p.alignment = _WDA.CENTER
+    _docx_font(p.add_run('지체보상금 청구서'), size=18, bold=True)
+
+    p2 = doc.add_paragraph(); p2.alignment = _WDA.CENTER
+    _docx_font(p2.add_run(f'기준월: {row.get("기준월", "")}'), size=10, color='888888')
+
+    doc.add_paragraph()
+
+    tbl = doc.add_table(rows=3, cols=2); tbl.style = 'Table Grid'
+    for i, (k, v) in enumerate([("수  신", row.get("판매처명","")),
+                                  ("사업자번호", row.get("사업자번호","")),
+                                  ("계약유형", row.get("계약유형",""))]):
+        _dcell(tbl.rows[i].cells[0], k, bold=True, color='FFFFFF', fill='18293F')
+        _dcell(tbl.rows[i].cells[1], v)
+    for r_obj in tbl.rows:
+        r_obj.cells[0].width = _Cm(4); r_obj.cells[1].width = _Cm(11)
+
+    doc.add_paragraph()
+    _docx_font(doc.add_paragraph().add_run('▶ 청구 내역'), size=11, bold=True)
 
     details = [
         ("현 미수금 잔액",   f"{int(row['현 미수금']):,}원"),
@@ -586,23 +632,89 @@ def make_공문_excel(row):
         ("지체보상금",       f"{int(row['지체보상금']):,}원"),
         ("계산 근거",        str(row.get("계산 근거", ""))),
     ]
-    for i, (k, v) in enumerate(details, start=9):
-        ws[f"A{i}"] = k; ws[f"B{i}"] = v
-        fill = STRIPE if i % 2 == 0 else None
-        for col in ["A", "B"]:
-            ws[f"{col}{i}"].font = Font(name="맑은 고딕", size=10)
-            ws[f"{col}{i}"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
-            if fill: ws[f"{col}{i}"].fill = fill
+    tbl2 = doc.add_table(rows=len(details)+1, cols=2); tbl2.style = 'Table Grid'
+    _dcell(tbl2.rows[0].cells[0], "항목", bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
+    _dcell(tbl2.rows[0].cells[1], "내역", bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
+    for i, (k, v) in enumerate(details, start=1):
+        bg = 'F5F7FA' if i % 2 == 0 else None
+        _dcell(tbl2.rows[i].cells[0], k, fill=bg)
+        _dcell(tbl2.rows[i].cells[1], v, fill=bg)
+    for r_obj in tbl2.rows:
+        r_obj.cells[0].width = _Cm(5); r_obj.cells[1].width = _Cm(10)
 
-    note_row = 9 + len(details) + 1
-    ws.merge_cells(f"A{note_row}:D{note_row}")
-    ws[f"A{note_row}"] = "※ 전표처리 전 반드시 거래처 회신 수령 완료 확인"
-    ws[f"A{note_row}"].font = Font(color="C0392B", italic=True, name="맑은 고딕", size=9)
+    doc.add_paragraph()
+    _docx_font(doc.add_paragraph().add_run("※ 전표처리 전 반드시 거래처 회신 수령 완료 확인"),
+               size=9, color='C0392B')
 
-    ws.column_dimensions["A"].width = 18
-    ws.column_dimensions["B"].width = 42
-    ws.freeze_panes = "A2"
-    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
+
+
+def make_공문_word_cumulative(vendor_df):
+    if not _HAS_DOCX:
+        raise ImportError("pip install python-docx 후 재시작 필요")
+    doc = _DocxDoc()
+    _docx_base(doc)
+
+    first = vendor_df.sort_values("기준월").iloc[0]
+    months = sorted(vendor_df["기준월"].unique())
+    period = f"{months[0]} ~ {months[-1]}"
+
+    p = doc.add_paragraph(); p.alignment = _WDA.CENTER
+    _docx_font(p.add_run('지체보상금 청구서'), size=18, bold=True)
+
+    p2 = doc.add_paragraph(); p2.alignment = _WDA.CENTER
+    _docx_font(p2.add_run(f'청구 기간: {period}'), size=10, color='888888')
+
+    doc.add_paragraph()
+
+    tbl = doc.add_table(rows=3, cols=2); tbl.style = 'Table Grid'
+    for i, (k, v) in enumerate([("수  신", str(first.get("판매처명",""))),
+                                  ("사업자번호", str(first.get("사업자번호",""))),
+                                  ("계약유형",  str(first.get("계약유형","")))]):
+        _dcell(tbl.rows[i].cells[0], k, bold=True, color='FFFFFF', fill='18293F')
+        _dcell(tbl.rows[i].cells[1], v)
+    for r_obj in tbl.rows:
+        r_obj.cells[0].width = _Cm(4); r_obj.cells[1].width = _Cm(11)
+
+    doc.add_paragraph()
+    _docx_font(doc.add_paragraph().add_run('▶ 월별 청구 내역'), size=11, bold=True)
+
+    hdrs = ["기준월", "현 미수금", "기준회전일", "현 회전일", "청구 증분일수", "요율", "지체보상금"]
+    sorted_df = vendor_df.sort_values("기준월")
+    n = len(sorted_df)
+    tbl2 = doc.add_table(rows=n+2, cols=len(hdrs)); tbl2.style = 'Table Grid'
+
+    for ci, h in enumerate(hdrs):
+        _dcell(tbl2.rows[0].cells[ci], h, size=9, bold=True, color='FFFFFF', fill='18293F', align=_WDA.CENTER)
+
+    for ri, (_, r) in enumerate(sorted_df.iterrows(), start=1):
+        bg = 'F5F7FA' if ri % 2 == 0 else None
+        for ci, v in enumerate([r["기준월"], f"{int(r['현 미수금']):,}", f"{int(r['유효기준회전일'])}",
+                                 f"{int(r['현 회전일'])}", f"{int(r['청구 증분일수'])}",
+                                 r["요율"], f"{int(r['지체보상금']):,}"]):
+            _dcell(tbl2.rows[ri].cells[ci], v, size=9, fill=bg, align=_WDA.CENTER)
+
+    total = int(vendor_df["지체보상금"].sum())
+    last = tbl2.rows[n+1]
+    _dcell(last.cells[0], "합  계", bold=True, fill='EBF5FB', align=_WDA.CENTER)
+    for ci in range(1, len(hdrs)-1):
+        _docx_shading(last.cells[ci], 'EBF5FB')
+    _dcell(last.cells[-1], f"{total:,}", bold=True, color='C0392B', fill='EBF5FB', align=_WDA.CENTER)
+
+    widths = [_Cm(2), _Cm(2.8), _Cm(1.8), _Cm(1.8), _Cm(2), _Cm(1.5), _Cm(3.1)]
+    for r_obj in tbl2.rows:
+        for ci, w in enumerate(widths):
+            r_obj.cells[ci].width = w
+
+    doc.add_paragraph()
+    p_tot = doc.add_paragraph(); p_tot.alignment = _WDA.RIGHT
+    _docx_font(p_tot.add_run(f'▶ 합계 청구금액: {total:,}원'), size=13, bold=True, color='C0392B')
+
+    doc.add_paragraph()
+    _docx_font(doc.add_paragraph().add_run("※ 전표처리 전 반드시 거래처 회신 수령 완료 확인"),
+               size=9, color='C0392B')
+
+    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 
 def make_공문_zip(df, month_label):
@@ -615,8 +727,20 @@ def make_공문_zip(df, month_label):
             row = row.copy()
             row["계산 근거"] = _calc_str(row)
             safe = re.sub(r'[\\/:*?"<>|]', '_', str(row["판매처명"]).strip())
-            fname = f"지체보상금청구_{safe}_{row['기준월']}.xlsx"
-            zf.writestr(fname, make_공문_excel(row))
+            fname = f"지체보상금청구_{safe}_{row['기준월']}.docx"
+            zf.writestr(fname, make_공문_word(row))
+    return buf.getvalue()
+
+
+def make_공문_zip_cumulative(result_df):
+    charge_df = result_df[result_df["지체보상금"] > 0]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for code, grp in charge_df.groupby("판매처코드"):
+            name = grp["판매처명"].iloc[0]
+            safe = re.sub(r'[\\/:*?"<>|]', '_', str(name).strip())
+            fname = f"지체보상금청구_{safe}_전체기간.docx"
+            zf.writestr(fname, make_공문_word_cumulative(grp))
     return buf.getvalue()
 
 
@@ -773,87 +897,97 @@ def run_calc(m_b, b_b, c_b, t_b):
 today_str = date.today().strftime("%Y. %m. %d")
 st.markdown(f"""
 <style>
-.ph-guide {{ position: relative; }}
-.ph-guide > summary {{
-  list-style: none; -webkit-appearance: none; cursor: pointer;
+#guide-chk {{ display: none; }}
+#guide-chk ~ .ph-guide-overlay {{ display: none; }}
+#guide-chk:checked ~ .ph-guide-overlay {{ display: flex; }}
+.ph-guide-btn {{
+  cursor: pointer;
   background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.28);
   color: #b0cfe0; padding: .3rem .85rem; border-radius: 5px;
   font-size: .77rem; font-weight: 700; white-space: nowrap;
   font-family: 'Nanum Gothic', sans-serif; transition: all .15s;
+  user-select: none;
 }}
-.ph-guide > summary::-webkit-details-marker {{ display: none; }}
-.ph-guide > summary:hover {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
-.ph-guide[open] > summary {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
+.ph-guide-btn:hover {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
+#guide-chk:checked ~ .ph-guide-overlay + label.ph-guide-btn {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
 .ph-guide-overlay {{
   position: fixed; inset: 0; background: rgba(0,0,0,.52);
-  z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 1rem;
+  z-index: 9998; align-items: center; justify-content: center; padding: 1rem;
+}}
+.ph-guide-backdrop {{
+  position: absolute; inset: 0; cursor: default; z-index: 0;
 }}
 .ph-guide-modal {{
-  background: #fff; border-radius: 12px; padding: 1.8rem 2rem 1.4rem;
+  background: #fff; border-radius: 12px; padding: 1.6rem 2rem 1.4rem;
   max-width: 580px; width: 100%; max-height: 82vh; overflow-y: auto;
-  box-shadow: 0 8px 30px rgba(0,0,0,.25); position: relative; z-index: 9999;
+  box-shadow: 0 8px 30px rgba(0,0,0,.25); position: relative; z-index: 1;
 }}
-.ph-guide-modal h3 {{
-  margin: 0 0 1.1rem; font-size: 1rem; font-weight: 800; color: #1a2535;
-  padding-bottom: .6rem; border-bottom: 2px solid #eaecf2;
+.ph-guide-close {{
+  cursor: pointer; background: #f2f4f8; border: 1px solid #dde3ef;
+  color: #666; padding: .22rem .7rem; border-radius: 5px;
+  font-size: .78rem; font-weight: 700; font-family: 'Nanum Gothic', sans-serif;
+  user-select: none;
 }}
-.ph-guide-hint {{ font-size: .7rem; color: #bbb; text-align: right; margin-top: .9rem; }}
+.ph-guide-close:hover {{ background: #e5e9f2; color: #333; }}
 </style>
 <div class="ph">
   <div class="ph-l">
     <div class="ph-title">지체보상금 대시보드</div>
     <div class="ph-sub">DW11 씽크채널 · 월말 순실잔고 × 증분지연일수 × 요율</div>
   </div>
-  <div style="display:flex;align-items:center;gap:.6rem">
+  <div style="display:flex;align-items:center;gap:.6rem;position:relative">
     <div class="ph-badge">{today_str} 기준</div>
-    <details class="ph-guide">
-      <summary>가이드 확인하기 ↗</summary>
-      <div class="ph-guide-overlay">
-        <div class="ph-guide-modal">
-          <h3>📋 지체보상금 처리 절차</h3>
-          <div class="guide-step-wrap">
-            <div class="guide-step">
-              <div class="guide-step-num" style="background:#2471a3">1</div>
-              <div class="guide-step-body">
-                <h4>대시보드에서 청구 대상 거래처 확인</h4>
-                <p>기준월 선택 후 청구 발생 거래처 목록에서 거래처별 지체보상금 금액 확인.</p>
-                <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">하단 상세 테이블에서 거래처코드 · 현미수금 · 기준회전일 · 지체보상금 · 계산 근거 확인 가능</div>
-                <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">일괄 공문 다운로드 버튼으로 거래처별 청구서 ZIP 추출 가능</div>
-              </div>
+    <input type="checkbox" id="guide-chk">
+    <div class="ph-guide-overlay">
+      <label for="guide-chk" class="ph-guide-backdrop"></label>
+      <div class="ph-guide-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    margin-bottom:1rem;padding-bottom:.6rem;border-bottom:2px solid #eaecf2">
+          <span style="font-size:1rem;font-weight:800;color:#1a2535">📋 지체보상금 처리 절차</span>
+          <label for="guide-chk" class="ph-guide-close">✕ 닫기</label>
+        </div>
+        <div class="guide-step-wrap">
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#2471a3">1</div>
+            <div class="guide-step-body">
+              <h4>대시보드에서 청구 대상 거래처 확인</h4>
+              <p>기준월 선택 후 청구 발생 거래처 목록에서 거래처별 지체보상금 금액 확인.</p>
+              <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">하단 상세 테이블에서 거래처코드 · 현미수금 · 기준회전일 · 지체보상금 · 계산 근거 확인 가능</div>
+              <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">일괄 공문 다운로드 버튼으로 거래처별 청구서 ZIP 추출 가능</div>
             </div>
-            <div class="guide-step">
-              <div class="guide-step-num" style="background:#e67e22">2</div>
-              <div class="guide-step-body">
-                <h4>거래처에 공문 발송</h4>
-                <p>청구 대상 거래처 확정 후 지체보상금 청구 공문 발송.</p>
-                <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">공문에 거래처명 · 기간 · 지체보상금 금액 · 계산 근거 포함</div>
-                <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">대시보드 하단 엑셀로 추출한 데이터를 공문 작성에 활용</div>
-              </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#e67e22">2</div>
+            <div class="guide-step-body">
+              <h4>거래처에 공문 발송</h4>
+              <p>청구 대상 거래처 확정 후 지체보상금 청구 공문 발송.</p>
+              <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">공문에 거래처명 · 기간 · 지체보상금 금액 · 계산 근거 포함</div>
+              <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">대시보드 하단 엑셀로 추출한 데이터를 공문 작성에 활용</div>
             </div>
-            <div class="guide-step">
-              <div class="guide-step-num" style="background:#27ae60">3</div>
-              <div class="guide-step-body">
-                <h4>거래처 회신 수령</h4>
-                <p>공문 발송 후 거래처로부터 회신 수령.</p>
-                <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">회신 내용 확인 후 금액 이견 없으면 다음 단계 진행</div>
-                <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">금액 이견 발생 시 계산 근거 재확인 후 조율</div>
-              </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#27ae60">3</div>
+            <div class="guide-step-body">
+              <h4>거래처 회신 수령</h4>
+              <p>공문 발송 후 거래처로부터 회신 수령.</p>
+              <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">회신 내용 확인 후 금액 이견 없으면 다음 단계 진행</div>
+              <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">금액 이견 발생 시 계산 근거 재확인 후 조율</div>
             </div>
-            <div class="guide-step">
-              <div class="guide-step-num" style="background:#8e44ad">4</div>
-              <div class="guide-step-body">
-                <h4>전표처리 (잡이익)</h4>
-                <p>거래처 회신 수령 완료 후 지체보상금을 잡이익으로 전표처리.</p>
-                <div class="guide-tip-row" style="border-color:#c0392b;background:#fdf0ef">
-                  <b style="color:#c0392b">전표처리 전 반드시 거래처 회신 수령 완료 확인</b>
-                </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-num" style="background:#8e44ad">4</div>
+            <div class="guide-step-body">
+              <h4>전표처리 (잡이익)</h4>
+              <p>거래처 회신 수령 완료 후 지체보상금을 잡이익으로 전표처리.</p>
+              <div class="guide-tip-row" style="border-color:#c0392b;background:#fdf0ef">
+                <b style="color:#c0392b">전표처리 전 반드시 거래처 회신 수령 완료 확인</b>
               </div>
             </div>
           </div>
-          <div class="ph-guide-hint">버튼을 다시 클릭하면 닫힙니다</div>
         </div>
       </div>
-    </details>
+    </div>
+    <label for="guide-chk" class="ph-guide-btn">가이드 확인하기 ↗</label>
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -1178,9 +1312,10 @@ st.plotly_chart(fig_combo, use_container_width=True, config={"displayModeBar": F
 
 # ── 다운로드 버튼 ────────────────────────────────────────────
 charge_only = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
+n_charge = len(charge_only)
 
-_, dc2, dc3, dc4, _ = st.columns([1, 2, 2, 2, 1])
-with dc2:
+dc1, dc2, dc3, dc4 = st.columns(4)
+with dc1:
     st.download_button(
         f"⬇ {mo_label(sel)} 발생현황 엑셀",
         data=make_excel(charge_only, f"{mo_label(sel)}"),
@@ -1188,7 +1323,7 @@ with dc2:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
-with dc3:
+with dc2:
     st.download_button(
         "⬇ 전체 기간 엑셀",
         data=make_full_excel(result_df),
@@ -1196,16 +1331,26 @@ with dc3:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
-with dc4:
-    n_charge = len(charge_only)
-    zip_disabled = n_charge == 0
+with dc3:
     st.download_button(
-        f"📄 공문 일괄 다운로드 ({n_charge}건)" if n_charge else "📄 공문 없음 (청구 0건)",
+        f"📄 {mo_label(sel)} 공문 Word ({n_charge}건)" if n_charge else "📄 공문 없음 (청구 0건)",
         data=make_공문_zip(charge_only, mo_label(sel)) if n_charge else b"",
         file_name=f"지체보상금_공문_{sel.replace('-','')}.zip",
         mime="application/zip",
-        disabled=zip_disabled,
+        disabled=(n_charge == 0),
         use_container_width=True,
+    )
+with dc4:
+    all_charge_df = result_df[result_df["지체보상금"] > 0]
+    n_vendors = all_charge_df["판매처코드"].nunique()
+    st.download_button(
+        f"📁 거래처별 전체기간 공문 ({n_vendors}개사)",
+        data=make_공문_zip_cumulative(result_df) if n_vendors else b"",
+        file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
+        mime="application/zip",
+        disabled=(n_vendors == 0),
+        use_container_width=True,
+        help="25년 전체 기간 거래처별 누계 공문 Word ZIP",
     )
 
 # ── 상세 탭 ──────────────────────────────────────────────────
@@ -1227,7 +1372,6 @@ with tab1:
                 f' = {int(r["지체보상금"]):,}원')
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    # 컬럼 순서: 식별 → 조직 → 재무 → 지체계산 → 참고
     _all_cols = [
         "판매처코드", "판매처명", "사업자번호", "계약유형", "채널",
         "사업부", "사무소", "담당자",
@@ -1244,10 +1388,11 @@ with tab1:
 
     disp = disp.reset_index(drop=True)
     disp.index = disp.index + 1
-    st.dataframe(
+    t1_event = st.dataframe(
         disp.style.apply(_sty, axis=1)
             .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
         use_container_width=True, height=430,
+        on_select="rerun", selection_mode="multi-row", key="tab1_df",
         column_config={
             "거래처코드":    st.column_config.TextColumn("거래처코드",   width=115),
             "판매처명":      st.column_config.TextColumn("거래처명",     width=210),
@@ -1268,6 +1413,34 @@ with tab1:
             "비고":          st.column_config.TextColumn("비고",         width=80),
         },
     )
+    _sel_pos = t1_event.selection.rows if t1_event.selection.rows else []
+    if _sel_pos:
+        _sel_codes = [view.iloc[i]["판매처코드"] for i in _sel_pos if i < len(view)]
+        _sel_mo_df  = view[view["판매처코드"].isin(_sel_codes) & (view["지체보상금"] > 0)]
+        _sel_all_df = result_df[result_df["판매처코드"].isin(_sel_codes) & (result_df["지체보상금"] > 0)]
+        n_mo  = len(_sel_mo_df)
+        n_all = _sel_all_df["판매처코드"].nunique()
+        st.markdown(f'<div style="font-size:.75rem;color:#888;margin:.4rem 0 .3rem">'
+                    f'선택된 거래처: <b style="color:#1a2535">{len(_sel_pos)}개사</b>'
+                    f'&nbsp;·&nbsp;이번달 청구 {n_mo}건&nbsp;·&nbsp;전체기간 청구처 {n_all}개사</div>',
+                    unsafe_allow_html=True)
+        _ba, _bb, _bc = st.columns([2, 2, 4])
+        with _ba:
+            st.download_button(
+                f"📄 선택 이번달 공문 ({n_mo}건)",
+                data=make_공문_zip(_sel_mo_df, mo_label(sel)) if n_mo else b"",
+                file_name=f"지체보상금_선택공문_{sel.replace('-','')}.zip",
+                mime="application/zip", disabled=(n_mo == 0), use_container_width=True,
+            )
+        with _bb:
+            st.download_button(
+                f"📁 선택 전체기간 공문 ({n_all}개사)",
+                data=make_공문_zip_cumulative(_sel_all_df) if n_all else b"",
+                file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
+                mime="application/zip", disabled=(n_all == 0), use_container_width=True,
+            )
+    else:
+        st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
 
 with tab2:
     pv = result_df.pivot_table(
@@ -1282,8 +1455,26 @@ with tab2:
     def _heat(s):
         mx = s.max() if s.max() else 1
         return [f"background-color: rgba(255,100,50,{v/mx*0.6:.2f})" for v in s]
-    st.dataframe(
-        pv.style.format({c: "{:,.0f}" for c in nc})
-          .apply(_heat, subset=["합계"]),
+    t2_event = st.dataframe(
+        pv.style.format({c: "{:,.0f}" for c in nc}).apply(_heat, subset=["합계"]),
         use_container_width=True, height=430,
+        on_select="rerun", selection_mode="multi-row", key="tab2_df",
     )
+    _t2_pos = t2_event.selection.rows if t2_event.selection.rows else []
+    if _t2_pos:
+        _t2_codes = [pv.iloc[i]["판매처코드"] for i in _t2_pos if i < len(pv)]
+        _t2_df = result_df[result_df["판매처코드"].isin(_t2_codes) & (result_df["지체보상금"] > 0)]
+        n_t2 = _t2_df["판매처코드"].nunique()
+        st.markdown(f'<div style="font-size:.75rem;color:#888;margin:.4rem 0 .3rem">'
+                    f'선택된 거래처: <b style="color:#1a2535">{len(_t2_pos)}개사</b></div>',
+                    unsafe_allow_html=True)
+        _ta, _tb, _tc = st.columns([2, 2, 4])
+        with _ta:
+            st.download_button(
+                f"📁 선택 전체기간 공문 ({n_t2}개사)",
+                data=make_공문_zip_cumulative(_t2_df) if n_t2 else b"",
+                file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
+                mime="application/zip", disabled=(n_t2 == 0), use_container_width=True,
+            )
+    else:
+        st.caption("행을 클릭하면 선택 → 전체기간 공문 다운로드 버튼이 표시됩니다")
