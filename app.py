@@ -567,9 +567,9 @@ def _docx_shading(cell, fill_hex):
 
 def _공문_doc_setup(doc):
     """잔고확인서와 동일한 여백 설정"""
-    for sec in doc.sections:
-        sec.top_margin = _Cm(1.8); sec.bottom_margin = _Cm(1.5)
-        sec.left_margin = _Cm(2.0); sec.right_margin = _Cm(2.0)
+    sec0 = doc.sections[0]
+    sec0.top_margin = _Cm(1.3); sec0.bottom_margin = _Cm(1.0)
+    sec0.left_margin = _Cm(1.8); sec0.right_margin = _Cm(1.8)
 
     def _rf(run, name='맑은 고딕'):
         rPr = run._r.get_or_add_rPr()
@@ -615,31 +615,35 @@ def _공문_doc_setup(doc):
         _p('대웅제약 주식회사', size=8.5, align=_WDA.CENTER, sa=0)
 
     def _sig(sig_addr="서울시 강남구 봉은사로 114길 12"):
-        p = _p(sa=2, align=_WDA.RIGHT)
-        _r(p, f'{sig_addr}\n주 식 회 사  대 웅 제 약\n대 표 이 사   이 창 재', size=10)
+        p1 = _p(sa=0, align=_WDA.RIGHT)
+        _r(p1, sig_addr, size=9.5)
+        p2 = _p(sa=0, align=_WDA.RIGHT)
+        _r(p2, '주 식 회 사  대 웅 제 약', size=10)
+        p3 = _p(sa=3, align=_WDA.RIGHT)
+        _r(p3, '대 표 이 사   이 창 재', size=10)
 
     def _letterhead(판매처명, 제목, doc_no_suffix):
         from datetime import date as _d
         today = _d.today()
         # 레터헤드
-        p_lh = _p(sa=2)
-        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=22)
-        _bline('bottom', sa=6)
+        p_lh = _p(sa=1)
+        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+        _bline('bottom', sa=3)
         # 문서번호 / 날짜
         th = doc.add_table(rows=1, cols=2)
         for cell in th.rows[0].cells:
-            cell._tc.get_or_add_tcPr()  # ensure tcPr exists
+            cell._tc.get_or_add_tcPr()
         _tc(th.rows[0].cells[0], f'문서번호 : {doc_no_suffix}')
         _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
-        _p(sa=4)
+        _p(sa=2)
         # 수신/제목
-        p = _p(sa=2)
+        p = _p(sa=1)
         _r(p, '수  신', bold=True, size=10.5)
         _r(p, f'  :  {판매처명} 귀중', size=10.5)
-        p = _p(sa=6)
+        p = _p(sa=3)
         _r(p, '제  목', bold=True, size=10.5)
         _r(p, f'  :  {제목}', bold=True, size=10.5)
-        _bline('top', sa=8)
+        _bline('top', sa=5)
         return today
 
     return _r, _p, _bline, _tc, _sig, _footer, _letterhead
@@ -656,15 +660,15 @@ def make_공문_word(row):
                         f"지체-{기준월.replace('-','')}-{판매처명[:4]}")
 
     # 본문 1
-    _p('1.', bold=True, size=10, sa=3)
-    p = _p(sa=6)
+    _p('1.', bold=True, size=10, sa=2)
+    p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
     _r(p, 기준월, bold=True, size=10)
     _r(p, ' 기준 지체보상금이 아래와 같이 발생하였기에 청구드립니다.', size=10)
 
     # 청구 내역 표
-    _p('─ 청구 내역', bold=True, size=10, sa=3)
+    _p('─ 청구 내역', bold=True, size=10, sa=2)
     details = [
         ('· 기준월',         기준월),
         ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
@@ -690,17 +694,17 @@ def make_공문_word(row):
         f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
         f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
     ] if x]
-    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=4, color='666666')
-    else:     _p(sa=4)
+    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=3, color='666666')
+    else:     _p(sa=3)
 
     # 본문 2
-    _p('2.', bold=True, size=10, sa=3)
-    p = _p(sa=12)
+    _p('2.', bold=True, size=10, sa=2)
+    p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
     _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
 
-    _p('거래처명 :                                                                                   (인)', size=10, sa=14)
+    _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig()
     _footer()
 
@@ -721,18 +725,18 @@ def make_공문_word_cumulative(vendor_df):
     from datetime import date as _d
     today = _d.today()
     _letterhead(판매처명, "지체보상금 청구의 건 (전체 기간)",
-                f"지체-{today.strftime('%Y')}전체-{판매처명[:4]}")
+                f"지체-{today.strftime('%Y')}-전체-{판매처명[:4]}")
 
     # 본문 1
-    _p('1.', bold=True, size=10, sa=3)
-    p = _p(sa=6)
+    _p('1.', bold=True, size=10, sa=2)
+    p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
     _r(p, period, bold=True, size=10)
     _r(p, ' 기간 동안 발생한 지체보상금 합계를 아래와 같이 청구드립니다.', size=10)
 
     # 월별 내역 표
-    _p('─ 월별 청구 내역', bold=True, size=10, sa=3)
+    _p('─ 월별 청구 내역', bold=True, size=10, sa=2)
     hdrs = ["기준월", "현 미수금", "기준회전일", "현 회전일", "청구 증분일수", "요율", "지체보상금"]
     sorted_df = vendor_df.sort_values("기준월")
     n = len(sorted_df)
@@ -760,19 +764,19 @@ def make_공문_word_cumulative(vendor_df):
         for ci, w in enumerate(widths): r_obj.cells[ci].width = w
 
     # 합계 강조
-    _p(sa=4)
-    p_tot = _p(sa=10, align=_WDA.RIGHT)
+    _p(sa=2)
+    p_tot = _p(sa=5, align=_WDA.RIGHT)
     _r(p_tot, '※ 합계 청구금액 : ', bold=True, size=11)
     _r(p_tot, f'{total:,} 원', bold=True, size=13, color='C0392B')
 
     # 본문 2
-    _p('2.', bold=True, size=10, sa=3)
-    p = _p(sa=12)
+    _p('2.', bold=True, size=10, sa=2)
+    p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
     _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
 
-    _p('거래처명 :                                                                                   (인)', size=10, sa=14)
+    _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig()
     _footer()
 
