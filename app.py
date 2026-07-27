@@ -771,29 +771,40 @@ def run_calc(m_b, b_b, c_b, t_b):
 # 헤더
 # ──────────────────────────────────────────────────────────────
 today_str = date.today().strftime("%Y. %m. %d")
-st.markdown(f"""<div class="ph">
+st.markdown(f"""
+<style>
+/* 헤더 뒤 컬럼을 헤더 위로 당기기 */
+div:has(.ph) + [data-testid="stHorizontalBlock"] {{
+  margin-top: -3.5rem !important;
+  margin-bottom: 1.6rem !important;
+  position: relative; z-index: 10;
+}}
+div:has(.ph) + [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child {{
+  visibility: hidden;
+}}
+div:has(.ph) + [data-testid="stHorizontalBlock"] button {{
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.3) !important;
+  color: #a8c5da !important;
+  border-radius: 50% !important;
+  font-weight: 800 !important; font-size: 13px !important;
+  width: 28px !important; height: 28px !important;
+  min-height: 28px !important; padding: 0 !important;
+}}
+div:has(.ph) + [data-testid="stHorizontalBlock"] button:hover {{
+  background: rgba(255,255,255,.22) !important; color: #fff !important;
+}}
+</style>
+<div class="ph">
   <div class="ph-l">
     <div class="ph-title">지체보상금 대시보드</div>
     <div class="ph-sub">DW11 씽크채널 · 월말 순실잔고 × 증분지연일수 × 요율</div>
   </div>
-  <div style="display:flex;align-items:center;gap:.6rem">
-    <div class="ph-badge">{today_str} 기준</div>
-    <div style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);
-                color:#a8c5da;width:28px;height:28px;border-radius:50%;
-                display:flex;align-items:center;justify-content:center;
-                font-size:13px;font-weight:800;cursor:default"
-         title="오른쪽 상단 처리 절차 버튼을 클릭하세요">?</div>
-  </div>
+  <div class="ph-badge">{today_str} 기준</div>
 </div>""", unsafe_allow_html=True)
 
 _g1, _g2 = st.columns([11, 1])
 with _g2:
-    st.markdown("""<style>
-/* 가이드 버튼 스타일 */
-[data-testid="stHorizontalBlock"]:has(button[data-testid="stBaseButton-secondary"]) button[data-testid="stBaseButton-secondary"] {
-  font-weight:800 !important;
-}
-</style>""", unsafe_allow_html=True)
     if st.button("?", key="_guide_open", help="처리 절차 가이드", use_container_width=True):
         _show_guide()
 
