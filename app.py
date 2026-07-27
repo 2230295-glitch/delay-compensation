@@ -773,40 +773,89 @@ def run_calc(m_b, b_b, c_b, t_b):
 today_str = date.today().strftime("%Y. %m. %d")
 st.markdown(f"""
 <style>
-/* 헤더 뒤 컬럼을 헤더 위로 당기기 */
-div:has(.ph) + [data-testid="stHorizontalBlock"] {{
-  margin-top: -3.5rem !important;
-  margin-bottom: 1.6rem !important;
-  position: relative; z-index: 10;
+.ph-guide {{ position: relative; }}
+.ph-guide > summary {{
+  list-style: none; -webkit-appearance: none; cursor: pointer;
+  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.28);
+  color: #b0cfe0; padding: .3rem .85rem; border-radius: 5px;
+  font-size: .77rem; font-weight: 700; white-space: nowrap;
+  font-family: 'Nanum Gothic', sans-serif; transition: all .15s;
 }}
-div:has(.ph) + [data-testid="stHorizontalBlock"] [data-testid="column"]:first-child {{
-  visibility: hidden;
+.ph-guide > summary::-webkit-details-marker {{ display: none; }}
+.ph-guide > summary:hover {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
+.ph-guide[open] > summary {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
+.ph-guide-overlay {{
+  position: fixed; inset: 0; background: rgba(0,0,0,.52);
+  z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 1rem;
 }}
-div:has(.ph) + [data-testid="stHorizontalBlock"] button {{
-  background: rgba(255,255,255,.12) !important;
-  border: 1px solid rgba(255,255,255,.3) !important;
-  color: #a8c5da !important;
-  border-radius: 50% !important;
-  font-weight: 800 !important; font-size: 13px !important;
-  width: 28px !important; height: 28px !important;
-  min-height: 28px !important; padding: 0 !important;
+.ph-guide-modal {{
+  background: #fff; border-radius: 12px; padding: 1.8rem 2rem 1.4rem;
+  max-width: 580px; width: 100%; max-height: 82vh; overflow-y: auto;
+  box-shadow: 0 8px 30px rgba(0,0,0,.25); position: relative; z-index: 9999;
 }}
-div:has(.ph) + [data-testid="stHorizontalBlock"] button:hover {{
-  background: rgba(255,255,255,.22) !important; color: #fff !important;
+.ph-guide-modal h3 {{
+  margin: 0 0 1.1rem; font-size: 1rem; font-weight: 800; color: #1a2535;
+  padding-bottom: .6rem; border-bottom: 2px solid #eaecf2;
 }}
+.ph-guide-hint {{ font-size: .7rem; color: #bbb; text-align: right; margin-top: .9rem; }}
 </style>
 <div class="ph">
   <div class="ph-l">
     <div class="ph-title">지체보상금 대시보드</div>
     <div class="ph-sub">DW11 씽크채널 · 월말 순실잔고 × 증분지연일수 × 요율</div>
   </div>
-  <div class="ph-badge">{today_str} 기준</div>
+  <div style="display:flex;align-items:center;gap:.6rem">
+    <div class="ph-badge">{today_str} 기준</div>
+    <details class="ph-guide">
+      <summary>가이드 확인하기 ↗</summary>
+      <div class="ph-guide-overlay">
+        <div class="ph-guide-modal">
+          <h3>📋 지체보상금 처리 절차</h3>
+          <div class="guide-step-wrap">
+            <div class="guide-step">
+              <div class="guide-step-num" style="background:#2471a3">1</div>
+              <div class="guide-step-body">
+                <h4>대시보드에서 청구 대상 거래처 확인</h4>
+                <p>기준월 선택 후 청구 발생 거래처 목록에서 거래처별 지체보상금 금액 확인.</p>
+                <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">하단 상세 테이블에서 거래처코드 · 현미수금 · 기준회전일 · 지체보상금 · 계산 근거 확인 가능</div>
+                <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">일괄 공문 다운로드 버튼으로 거래처별 청구서 ZIP 추출 가능</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num" style="background:#e67e22">2</div>
+              <div class="guide-step-body">
+                <h4>거래처에 공문 발송</h4>
+                <p>청구 대상 거래처 확정 후 지체보상금 청구 공문 발송.</p>
+                <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">공문에 거래처명 · 기간 · 지체보상금 금액 · 계산 근거 포함</div>
+                <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">대시보드 하단 엑셀로 추출한 데이터를 공문 작성에 활용</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num" style="background:#27ae60">3</div>
+              <div class="guide-step-body">
+                <h4>거래처 회신 수령</h4>
+                <p>공문 발송 후 거래처로부터 회신 수령.</p>
+                <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">회신 내용 확인 후 금액 이견 없으면 다음 단계 진행</div>
+                <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">금액 이견 발생 시 계산 근거 재확인 후 조율</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num" style="background:#8e44ad">4</div>
+              <div class="guide-step-body">
+                <h4>전표처리 (잡이익)</h4>
+                <p>거래처 회신 수령 완료 후 지체보상금을 잡이익으로 전표처리.</p>
+                <div class="guide-tip-row" style="border-color:#c0392b;background:#fdf0ef">
+                  <b style="color:#c0392b">전표처리 전 반드시 거래처 회신 수령 완료 확인</b>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ph-guide-hint">버튼을 다시 클릭하면 닫힙니다</div>
+        </div>
+      </div>
+    </details>
+  </div>
 </div>""", unsafe_allow_html=True)
-
-_g1, _g2 = st.columns([11, 1])
-with _g2:
-    if st.button("?", key="_guide_open", help="처리 절차 가이드", use_container_width=True):
-        _show_guide()
 
 result_df = contract_map = None
 if m_b and b_b:
