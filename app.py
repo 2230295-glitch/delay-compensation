@@ -1383,7 +1383,7 @@ with dc1:
         data=make_excel(charge_only, f"{mo_label(sel)}"),
         file_name=f"지체보상금_{sel.replace('-','')}_발생현황.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
+        use_container_width=True, key="btn_dl_mo_excel",
     )
 with dc2:
     st.download_button(
@@ -1391,7 +1391,7 @@ with dc2:
         data=make_full_excel(result_df),
         file_name=f"지체보상금_전체_{date.today():%Y%m%d}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
+        use_container_width=True, key="btn_dl_full_excel",
     )
 with dc3:
     st.download_button(
@@ -1400,7 +1400,7 @@ with dc3:
         file_name=f"지체보상금_공문_{sel.replace('-','')}.zip",
         mime="application/zip",
         disabled=(n_charge == 0),
-        use_container_width=True,
+        use_container_width=True, key="btn_dl_mo_docx",
     )
 with dc4:
     all_charge_df = result_df[result_df["지체보상금"] > 0]
@@ -1411,7 +1411,7 @@ with dc4:
         file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
         mime="application/zip",
         disabled=(n_vendors == 0),
-        use_container_width=True,
+        use_container_width=True, key="btn_dl_all_docx",
         help="25년 전체 기간 거래처별 누계 공문 Word ZIP",
     )
 
@@ -1493,6 +1493,7 @@ with tab1:
                 data=make_공문_zip(_sel_mo_df, mo_label(sel)) if n_mo else b"",
                 file_name=f"지체보상금_선택공문_{sel.replace('-','')}.zip",
                 mime="application/zip", disabled=(n_mo == 0), use_container_width=True,
+                key="btn_sel_mo_docx",
             )
         with _bb:
             st.download_button(
@@ -1500,6 +1501,7 @@ with tab1:
                 data=make_공문_zip_cumulative(_sel_all_df) if n_all else b"",
                 file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
                 mime="application/zip", disabled=(n_all == 0), use_container_width=True,
+                key="btn_sel_cum_t1",
             )
     else:
         st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
@@ -1537,6 +1539,7 @@ with tab2:
                 data=make_공문_zip_cumulative(_t2_df) if n_t2 else b"",
                 file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
                 mime="application/zip", disabled=(n_t2 == 0), use_container_width=True,
+                key="btn_sel_cum_t2",
             )
     else:
         st.caption("행을 클릭하면 선택 → 전체기간 공문 다운로드 버튼이 표시됩니다")
