@@ -25,18 +25,18 @@ from openpyxl.utils import get_column_letter as gcl
 
 st.set_page_config(page_title="지체보상금 대시보드", layout="wide", page_icon="📊")
 
-# 나눔고딕 <link> 태그로 로드 (더 안정적)
+# 나눔스퀘어네오 <link> 태그로 로드
 st.markdown(
     '<link rel="preconnect" href="https://fonts.googleapis.com">'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-    '<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">',
+    '<link href="https://fonts.googleapis.com/css2?family=Nanum+Square+Neo:wght@300;400;700;800&display=swap" rel="stylesheet">',
     unsafe_allow_html=True,
 )
 
 st.markdown("""<style>
 html, body, [class*="css"], .stApp, button, input, select, textarea,
 [data-testid], [data-baseweb], .stMarkdown, .stDataFrame, p, span, div, th, td {
-  font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Nanum Square Neo', 'Malgun Gothic', sans-serif !important;
 }
 
 /* ── 배경 + 상단 패딩 제거 ── */
@@ -52,7 +52,7 @@ header[data-testid="stHeader"] { display: none !important; }
 /* ── 사이드바 ── */
 section[data-testid="stSidebar"] > div:first-child { background: #1b2838 !important; }
 section[data-testid="stSidebar"] * {
-  font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Nanum Square Neo', 'Malgun Gothic', sans-serif !important;
 }
 section[data-testid="stSidebar"] label { color: #8ab3cf !important; font-size: .82rem !important; }
 section[data-testid="stSidebar"] p     { color: #6a93b0 !important; font-size: .78rem !important; }
@@ -114,10 +114,17 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
   background: #1b2838 !important; color: #fff !important;
   border: none !important; border-radius: 6px !important;
   font-weight: 800 !important; font-size: .84rem !important;
-  font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Nanum Square Neo', 'Malgun Gothic', sans-serif !important;
   padding: .55rem 1.1rem !important;
+  white-space: nowrap !important;
 }
 .stDownloadButton > button:hover { background: #243444 !important; }
+
+/* ── 줄바꿈 방지 ── */
+.kpi-lbl, .kpi-num, .kpi-unit, .kpi-delta { white-space: nowrap; }
+[data-testid="stDataFrame"] th { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
+[data-testid="stDataFrame"] td { white-space: nowrap !important; }
+.stButton > button { white-space: nowrap !important; }
 
 /* ── 탭 ── */
 .stTabs {
@@ -130,7 +137,7 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
 .stTabs [data-baseweb="tab-list"] { gap: .25rem; border-bottom: 2px solid #dde3ef; background: transparent; }
 .stTabs [data-baseweb="tab"] {
   font-weight: 700; font-size: .84rem; padding: .38rem 1rem; color: #aaa;
-  font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Nanum Square Neo', 'Malgun Gothic', sans-serif !important;
   background: transparent !important;
 }
 .stTabs [data-baseweb="tab-panel"] { background: transparent !important; padding: .6rem 0 0; }
@@ -138,7 +145,7 @@ section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
 
 /* ── 버튼 ── */
 .stButton > button {
-  font-family: 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Nanum Square Neo', 'Malgun Gothic', sans-serif !important;
   font-weight: 700 !important; border-radius: 6px !important;
 }
 
@@ -971,7 +978,7 @@ st.markdown(f"""
   background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.28);
   color: #b0cfe0; padding: .3rem .85rem; border-radius: 5px;
   font-size: .77rem; font-weight: 700; white-space: nowrap;
-  font-family: 'Nanum Gothic', sans-serif; transition: all .15s;
+  font-family: 'Nanum Square Neo', sans-serif; transition: all .15s;
   user-select: none;
 }}
 .ph-guide-btn:hover {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
@@ -991,7 +998,7 @@ st.markdown(f"""
 .ph-guide-close {{
   cursor: pointer; background: #f2f4f8; border: 1px solid #dde3ef;
   color: #666; padding: .22rem .7rem; border-radius: 5px;
-  font-size: .78rem; font-weight: 700; font-family: 'Nanum Gothic', sans-serif;
+  font-size: .78rem; font-weight: 700; font-family: 'Nanum Square Neo', sans-serif;
   user-select: none;
 }}
 .ph-guide-close:hover {{ background: #e5e9f2; color: #333; }}
