@@ -39,8 +39,14 @@ html, body, [class*="css"], .stApp, button, input, select, textarea,
 
 /* ── 배경 + 상단 패딩 제거 ── */
 .stApp { background: #f2f4f8; }
-header[data-testid="stHeader"] { display: none !important; }
-[data-testid="collapsedControl"] { display: flex !important; position: fixed !important; top: 0.5rem !important; left: 0.5rem !important; z-index: 999 !important; }
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 2.5rem !important;
+  min-height: 0 !important;
+}
+[data-testid="stToolbar"] { visibility: hidden !important; }
+[data-testid="stDecoration"] { display: none !important; }
+[data-testid="stStatusWidget"] { display: none !important; }
 #MainMenu { display: none !important; }
 .stMainBlockContainer, .block-container, .appview-container .main .block-container {
   max-width: 100% !important;
