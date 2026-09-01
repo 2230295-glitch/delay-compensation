@@ -23,7 +23,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter as gcl
 
-st.set_page_config(page_title="지체보상금 대시보드", layout="wide", page_icon="📊")
+st.set_page_config(page_title="지체보상금 대시보드", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
 
 # 나눔스퀘어네오 — Google Fonts 미지원, jsDelivr CDN 사용
 st.markdown(
@@ -40,6 +40,7 @@ html, body, [class*="css"], .stApp, button, input, select, textarea,
 /* ── 배경 + 상단 패딩 제거 ── */
 .stApp { background: #f2f4f8; }
 header[data-testid="stHeader"] { display: none !important; }
+[data-testid="collapsedControl"] { display: flex !important; position: fixed !important; top: 0.5rem !important; left: 0.5rem !important; z-index: 999 !important; }
 #MainMenu { display: none !important; }
 .stMainBlockContainer, .block-container, .appview-container .main .block-container {
   max-width: 100% !important;
