@@ -1,4 +1,4 @@
-"""
+﻿"""
 지체보상금 대시보드 v6
 실행: streamlit run app.py
 """
@@ -848,41 +848,26 @@ def _read_bytes(path_str: str):
     return p.read_bytes() if p.exists() else None
 
 # ──────────────────────────────────────────────────────────────
-# 사이드바
+# 파일 관리 (메인 영역 expander)
 # ──────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown(
-        '<div style="background:#080f18;margin:-1rem -1rem .8rem;padding:1.1rem 1.2rem;">'
-        '<div style="font-size:1rem;font-weight:800;color:#fff;font-family:\'Nanum Gothic\',sans-serif">📊 지체보상금</div>'
-        '<div style="font-size:.68rem;color:#3a6885;margin-top:.2rem;font-family:\'Nanum Gothic\',sans-serif">DW11 씽크채널 · 누적 증분 방식</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+f_monthly = f_base = f_contract = None
+with st.expander("📁 파일 관리", expanded=False):
     use_default = st.checkbox("input 폴더 기본 파일 사용", value=True)
     if use_default:
         _mo_files = (sorted(MO_FOLDER.glob("*.xlsx")) + sorted(MO_FOLDER.glob("*.xls"))) if MO_FOLDER.exists() else []
         _mo_lbl = f"월별 잔고 ({len(_mo_files)}개 파일)" if _mo_files else "월별 잔고"
-        for lbl, ok in [(_mo_lbl, bool(_mo_files)),
+        _scols = st.columns(3)
+        for _ci, (_lbl, _ok) in enumerate([(_mo_lbl, bool(_mo_files)),
                          ("기준회전일", BASE_PATH.exists()),
-                         ("계약서", CT_PATH is not None)]:
-            c = "#3dbb85" if ok else "#e05555"
-            i = "✓" if ok else "✗"
-            st.markdown(f'<div style="font-size:.78rem;color:{c};padding:.15rem 0;'
-                        f'font-family:\'Nanum Gothic\',sans-serif">{i} {lbl}</div>',
-                        unsafe_allow_html=True)
+                         ("계약서", CT_PATH is not None)]):
+            _c = "#3dbb85" if _ok else "#e05555"
+            _ic = "✓" if _ok else "✗"
+            _scols[_ci].markdown(f'<span style="color:{_c};font-size:.85rem">{_ic} {_lbl}</span>', unsafe_allow_html=True)
     else:
-        f_monthly  = st.file_uploader("월별 잔고",   type=["xlsx","xls"])
-        f_base     = st.file_uploader("기준회전일",  type=["xlsx","xls"])
-        f_contract = st.file_uploader("계약서 파일", type=["xlsx","xls"])
-    st.markdown("---")
-    st.markdown(
-        '<div style="font-size:.72rem;color:#3a5e7a;line-height:1.9;font-family:\'Nanum Gothic\',sans-serif">'
-        '<b style="color:#5a8faa">계산 기준</b><br>'
-        '월말 순실잔고 × 증분지연일수 × 요율<br>'
-        '<b style="color:#5a8faa">유효기준회전일</b><br>'
-        '예외 > 약정 > 기준</div>',
-        unsafe_allow_html=True,
-    )
+        _uc1, _uc2, _uc3 = st.columns(3)
+        f_monthly  = _uc1.file_uploader("월별 잔고",   type=["xlsx","xls"])
+        f_base     = _uc2.file_uploader("기준회전일",  type=["xlsx","xls"])
+        f_contract = _uc3.file_uploader("계약서 파일", type=["xlsx","xls"])
 
 # ──────────────────────────────────────────────────────────────
 # 데이터
