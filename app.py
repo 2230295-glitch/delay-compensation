@@ -101,18 +101,24 @@ section[data-testid="stSidebar"] { display: none !important; }
 .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 1.2rem; }
 .kpi-card {
   background: #fff; border-radius: 6px;
-  padding: 1rem 1.2rem 1rem;
-  border: 1px solid #E0E0E0;
+  padding: .95rem 1.1rem .9rem 1rem;
+  border: 1px solid #E8E8E8;
+  border-left: 4px solid #E0E0E0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
-.kpi-lbl  { font-size: .7rem; color: #9E9E9E; font-weight: 500; letter-spacing: .01em; margin-bottom: .4rem; }
-.kpi-val  { font-size: 2.4rem; font-weight: 700; color: #212121; line-height: 1; letter-spacing: -.03em; }
+.kpi-card.orange { border-left-color: #F57C00; }
+.kpi-card.red    { border-left-color: #E53E3E; }
+.kpi-card.blue   { border-left-color: #1565C0; }
+.kpi-card.gray   { border-left-color: #9E9E9E; }
+.kpi-lbl  { font-size: .69rem; color: #9E9E9E; font-weight: 500; letter-spacing: .01em; margin-bottom: .38rem; }
+.kpi-val  { font-size: 1.85rem; font-weight: 700; color: #212121; line-height: 1.05; letter-spacing: -.02em; }
 .kpi-val.orange { color: #F57C00; }
 .kpi-val.red    { color: #E53E3E; }
 .kpi-val.blue   { color: #1565C0; }
-.kpi-unit { font-size: 1rem; font-weight: 500; color: #616161; margin-left: .05rem; }
-.kpi-sub  { font-size: .71rem; color: #9E9E9E; margin-top: .4rem; line-height: 1.6; }
-.kpi-up   { color: #E53E3E; font-weight: 700; }
-.kpi-dn   { color: #1565C0; font-weight: 700; }
+.kpi-unit { font-size: .88rem; font-weight: 500; color: #757575; margin-left: .08rem; }
+.kpi-sub  { font-size: .7rem; color: #9E9E9E; margin-top: .42rem; line-height: 1.7; }
+.kpi-up   { color: #E53E3E; font-weight: 600; }
+.kpi-dn   { color: #1565C0; font-weight: 600; }
 
 /* ── 섹션 헤더 ── */
 .sec-hd {
@@ -895,22 +901,22 @@ with tab_agg:
 
     st.markdown(f"""
     <div class="kpi-row">
-      <div class="kpi-card">
+      <div class="kpi-card orange">
         <div class="kpi-lbl">전체 기간 지체보상금</div>
         <div class="kpi-val orange">{fmt_won(total_all, short=True)}</div>
         <div class="kpi-sub">{months_sorted[0]} ~ {months_sorted[-1]}</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card orange">
         <div class="kpi-lbl">{cur_yr}년 누계</div>
         <div class="kpi-val orange">{fmt_won(ann_total, short=True)}</div>
         <div class="kpi-sub">{cur_yr}년 발생 합계</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card red">
         <div class="kpi-lbl">청구 거래처 수 (전 기간)</div>
         <div class="kpi-val red">{total_vend}<span class="kpi-unit">개</span></div>
         <div class="kpi-sub">지체보상금 발생 고유 거래처</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card gray">
         <div class="kpi-lbl">최고 발생 월</div>
         <div class="kpi-val">{mo_label(best_mo) if best_mo != "-" else "-"}</div>
         <div class="kpi-sub">{fmt_won(best_mo_amt)}</div>
@@ -1162,22 +1168,22 @@ with tab_detail:
     # ── 월 KPI ──────────────────────────────────────────────
     st.markdown(f"""
     <div class="kpi-row">
-      <div class="kpi-card">
+      <div class="kpi-card orange">
         <div class="kpi-lbl">{mo_label(sel)} 지체보상금</div>
         <div class="kpi-val orange">{fmt_won(sel_total, short=True)}</div>
         <div class="kpi-sub">{d_html}</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card red">
         <div class="kpi-lbl">청구 건수</div>
         <div class="kpi-val red">{sel_n}<span class="kpi-unit">건</span></div>
         <div class="kpi-sub">{_delta_html(sel_n, prev_n, "건")}</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card blue">
         <div class="kpi-lbl">청구 거래처</div>
         <div class="kpi-val blue">{sel_cu}<span class="kpi-unit">개</span></div>
         <div class="kpi-sub">{_delta_html(sel_cu, prev_cu, "개")}</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card orange">
         <div class="kpi-lbl">{_sel_yr}년 누계</div>
         <div class="kpi-val orange">{fmt_won(ann_sel, short=True)}</div>
         <div class="kpi-sub">{_sel_yr}년 1월 ~ {mo_label(sel)}</div>
@@ -1195,18 +1201,24 @@ with tab_detail:
         _pj = int(_p["지체보상금"]) if _p is not None else 0
         _cp = int(_c["현 미수금"])   if _c is not None else 0
         _pp = int(_p["현 미수금"])   if _p is not None else 0
-        _nm = (_c if _c is not None else _p)["판매처명"]
-        if _cj > 0 and _pj == 0:   _신규.append({"명칭": _nm, "금액": _cj})
-        elif _cj > 0 and _pj > 0:  _추가.append({"명칭": _nm, "금액": _cj})
-        if _pj > 0 and _cj == 0:   _수금.append({"명칭": _nm, "금액": max(_pp - _cp, 0) or _pp})
+        _src = _c if _c is not None else _p
+        _nm = _src["판매처명"]
+        _org = str(_src.get("사무소", "") or _src.get("사업부", "") or "").strip()
+        _org = "" if _org in ("nan", "None") else _org
+        if _cj > 0 and _pj == 0:   _신규.append({"명칭": _nm, "금액": _cj, "org": _org})
+        elif _cj > 0 and _pj > 0:  _추가.append({"명칭": _nm, "금액": _cj, "org": _org})
+        if _pj > 0 and _cj == 0:   _수금.append({"명칭": _nm, "금액": max(_pp - _cp, 0) or _pp, "org": _org})
     for _lst in (_신규, _추가, _수금): _lst.sort(key=lambda x: -x["금액"])
 
     def _chg_html(lst, cls, title, amt_color):
         rows = ""
         for i, x in enumerate(lst[:5]):
+            org_badge = (f'<span style="font-size:.65rem;color:#9E9E9E;margin-left:.3rem;'
+                         f'background:#F5F5F5;border-radius:3px;padding:1px 5px">{x["org"]}</span>'
+                         if x.get("org") else "")
             rows += (f'<div class="chg-row">'
                      f'<span class="chg-num">{i+1}</span>'
-                     f'<span class="chg-name">{x["명칭"]}</span>'
+                     f'<span class="chg-name">{x["명칭"]}{org_badge}</span>'
                      f'<span class="chg-amt" style="color:{amt_color}">{fmt_won(x["금액"], short=True)}</span>'
                      f'</div>')
         if len(lst) > 5:
@@ -1224,6 +1236,61 @@ with tab_detail:
     with cc1: st.markdown(_chg_html(_신규, "red",   f"{mo_label(sel)} 신규 연체", "#ef4444"), unsafe_allow_html=True)
     with cc2: st.markdown(_chg_html(_추가, "amber", f"{mo_label(sel)} 추가 연체", "#d97706"), unsafe_allow_html=True)
     with cc3: st.markdown(_chg_html(_수금, "green", f"{mo_label(sel)} 수금 완료", "#059669"), unsafe_allow_html=True)
+
+    st.markdown('<div style="margin:.8rem 0"></div>', unsafe_allow_html=True)
+
+    # ── 인사이트: 누적 TOP 거래처 + 이번달 신규 발생처 ──────────
+    ic1, ic2 = st.columns(2, gap="medium")
+
+    with ic1:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>누적 지체보상금 TOP 거래처</div>', unsafe_allow_html=True)
+        top_all = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
+                   .sum().reset_index()
+                   .sort_values("지체보상금", ascending=False).head(5).reset_index(drop=True))
+        top_html = ""
+        medals = ["🥇","🥈","🥉","4","5"]
+        for i, row in top_all.iterrows():
+            v = int(row["지체보상금"])
+            medal = medals[i]
+            if medal in ("4","5"):
+                medal_html = f'<span class="chg-num">{medal}</span>'
+            else:
+                medal_html = f'<span style="font-size:1rem;margin-right:.45rem">{medal}</span>'
+            top_html += (f'<div class="chg-row">'
+                         f'{medal_html}'
+                         f'<span class="chg-name">{row["판매처명"]}</span>'
+                         f'<span class="chg-amt" style="color:#F57C00">{fmt_won(v, short=True)}</span>'
+                         f'</div>')
+        st.markdown(f'<div class="chg-card orange">'
+                    f'<div class="chg-title">전 기간 누적 합계 기준 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">TOP 5</span></div>'
+                    f'{top_html}</div>', unsafe_allow_html=True)
+
+    with ic2:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>이번달 신규 지체보상금 발생처</div>', unsafe_allow_html=True)
+        if not prev_df.empty:
+            prev_charged = set(prev_df[prev_df["지체보상금"] > 0]["판매처코드"])
+        else:
+            prev_charged = set()
+        new_this_mo = sel_df[(sel_df["지체보상금"] > 0) & (~sel_df["판매처코드"].isin(prev_charged))].sort_values("지체보상금", ascending=False)
+        new_html = ""
+        for i, (_, row) in enumerate(new_this_mo.head(5).iterrows()):
+            v = int(row["지체보상금"])
+            org = str(row.get("사무소","") or row.get("사업부","") or "").strip()
+            org = "" if org in ("nan","None") else org
+            org_badge = (f'<span style="font-size:.65rem;color:#9E9E9E;margin-left:.3rem;'
+                         f'background:#F5F5F5;border-radius:3px;padding:1px 5px">{org}</span>'
+                         if org else "")
+            new_html += (f'<div class="chg-row">'
+                         f'<span class="chg-num">{i+1}</span>'
+                         f'<span class="chg-name">{row["판매처명"]}{org_badge}</span>'
+                         f'<span class="chg-amt" style="color:#ef4444">{fmt_won(v, short=True)}</span>'
+                         f'</div>')
+        if new_this_mo.empty:
+            new_html = '<div style="color:#BDBDBD;font-size:.81rem;padding:1.2rem .9rem;text-align:center">이번달 신규 발생 없음</div>'
+        badge_n = f'<span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">{len(new_this_mo)}처</span>'
+        st.markdown(f'<div class="chg-card red">'
+                    f'<div class="chg-title">{mo_label(sel)} 처음 발생{badge_n}</div>'
+                    f'{new_html}</div>', unsafe_allow_html=True)
 
     st.markdown('<div style="margin:.8rem 0"></div>', unsafe_allow_html=True)
 
