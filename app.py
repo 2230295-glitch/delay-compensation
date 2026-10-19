@@ -323,14 +323,20 @@ def load_contract(file_bytes, sap_df):
     def _fcol(*names):
         for n in names:
             for c in df.columns:
-                if n in c: return c
+                if n in str(c): return c
         return None
-    col_no    = _fcol('No', 'NO', 'no')
-    col_name  = _fcol('병원명', '병원', '거래처명', '고객명')
-    col_code  = _fcol('거래처코드', '판매처코드', '고객코드', '코드')
-    col_type  = _fcol('계약유형', '유형')
-    col_biz   = _fcol('사업자번호', '사업자')
+    col_no    = _fcol('No', 'NO', 'no', 'N0')
+    col_name  = _fcol('병원명', '병원', '거래처명', '고객명', '업체명')
+    col_code  = _fcol('거래처코드', '판매처코드', '고객코드', '거래처 코드', '판매처 코드')
+    col_type  = _fcol('계약유형', '유형', '계약 유형')
+    col_biz   = _fcol('사업자번호', '사업자 번호', '사업자No', '사업자 No', '사업자등록번호', '사업자등록')
     col_jiche = _fcol('지체보상금')
+    # fallback: 컬럼 못찾을 경우 위치 기반 (원본 cols 순서 참고)
+    _cols_fb  = list(df.columns)
+    if col_code is None and len(_cols_fb) > 2:  col_code = _cols_fb[2]   # C열
+    if col_type is None and len(_cols_fb) > 3:  col_type = _cols_fb[3]   # D열
+    if col_biz  is None and len(_cols_fb) > 4:  col_biz  = _cols_fb[4]   # E열
+    if col_jiche is None and len(_cols_fb) > 10: col_jiche = _cols_fb[10] # K열
 
     # 숫자 No. 행만 유지
     if col_no:
@@ -982,10 +988,11 @@ with tab_agg:
     ins1, ins2 = st.columns(2, gap="medium")
 
     with ins1:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>지체보상금 다발 거래처 TOP 5</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>전 기간 누적 합계 리스트</div>', unsafe_allow_html=True)
+        _top_n = 8
         _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
                  .sum().reset_index()
-                 .sort_values("지체보상금", ascending=False).head(5).reset_index(drop=True))
+                 .sort_values("지체보상금", ascending=False).head(_top_n).reset_index(drop=True))
         _top_html = ""
         for _i, _row in _top5.iterrows():
             _v = int(_row["지체보상금"])
@@ -995,7 +1002,7 @@ with tab_agg:
                           f'<span class="chg-amt" style="color:#F57C00">{fmt_won(_v, short=True)}</span>'
                           f'</div>')
         st.markdown(f'<div class="chg-card orange">'
-                    f'<div class="chg-title">전 기간 누적 합계 기준 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">TOP 5</span></div>'
+                    f'<div class="chg-title">전 기간 누적 합계 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">상위 {_top_n}개사</span></div>'
                     f'{_top_html}</div>', unsafe_allow_html=True)
 
     with ins2:
@@ -1116,67 +1123,51 @@ with tab_agg:
         _note = f"최근 {len(_mo_window)}개월" if len(months_sorted) > _WINDOW else f"전체 {len(_mo_window)}개월"
         st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>월별 지체보상금 추이 <span class="sec-sub">{_note}</span></div>', unsafe_allow_html=True)
 
-        x_w  = [mo_label(m) for m in _mo_window]
-        y_w  = [int(mo_sum.get(m, 0)) / 1e8 for m in _mo_window]
+        # 가로 막대: 최신 월이 위에 오도록 역순 정렬
+        _mo_rev  = list(reversed(_mo_window))
+        y_labels = [mo_label(m) for m in _mo_rev]
+        x_vals   = [int(mo_sum.get(m, 0)) / 1e8 for m in _mo_rev]
 
-        # 최근 6개월은 진한색, 나머지는 연한색
-        _n_w = len(_mo_window)
-        _bar_palette = ["#42A5F5","#5C6BC0","#66BB6A","#FFA726","#AB47BC","#26C6DA",
-                        "#EF5350","#8D6E63","#78909C","#26A69A","#EC407A","#FF7043"]
+        _bar_palette = ["#F57C00","#AB47BC","#42A5F5","#66BB6A","#EF5350","#26C6DA",
+                        "#FFA726","#5C6BC0","#26A69A","#EC407A","#8D6E63","#78909C"]
+        _n_w = len(_mo_rev)
         bar_colors_w = [_bar_palette[i % len(_bar_palette)] if v > 0 else "#E8E8E8"
-                        for i, v in enumerate(y_w)]
+                        for i, v in enumerate(x_vals)]
+        _x_max = max(x_vals) if any(v > 0 for v in x_vals) else 1
 
-        # 누적은 전체 기간 기준으로 계산 후 윈도우 슬라이싱
-        _cum_full, _run = [], 0
-        for m in months_sorted:
-            _run += int(mo_sum.get(m, 0)) / 1e8
-            _cum_full.append(round(_run, 2))
-        _cum_w = _cum_full[-len(_mo_window):]
-
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=x_w, y=y_w, name="월 발생",
+        fig = go.Figure(go.Bar(
+            y=y_labels, x=x_vals,
+            orientation="h",
             marker=dict(color=bar_colors_w, line_width=0, cornerradius=6),
-            text=[f"{v:.2f}억" if v >= 0.01 else "" for v in y_w],
+            text=[f"{v:.2f}억" if v >= 0.01 else "" for v in x_vals],
             textposition="outside", cliponaxis=False,
-            textfont=dict(size=9, color="#546e7a", family=FONT),
-            hovertemplate="<b>%{x}</b><br>월 발생: %{y:.2f}억원<extra></extra>",
-            yaxis="y1",
+            textfont=dict(size=10, color="#546e7a", family=FONT),
+            hovertemplate="<b>%{y}</b><br>%{x:.2f}억원<extra></extra>",
         ))
-        fig.add_trace(go.Scatter(
-            x=x_w, y=[v if v > 0 else None for v in _cum_w], name="누적",
-            mode="lines+markers",
-            line=dict(color="#E65100", width=2, dash="solid"),
-            marker=dict(size=5, color="#E65100", line=dict(color="#fff", width=1.5)),
-            hovertemplate="<b>%{x}</b><br>누적: %{y:.2f}억원<extra></extra>",
-            yaxis="y2",
-        ))
-        _mo_max = max(y_w) if any(v > 0 for v in y_w) else 1
-        _cu_max = max(v for v in _cum_w if v) if any(v for v in _cum_w) else 1
         fig.update_layout(
             title=dict(
-                text=f'<b>월별 지체보상금 추이</b>  <span style="font-size:12px;color:#9E9E9E">최근 {len(_mo_window)}개월</span>',
+                text=f'<b>월별 지체보상금 추이</b>  <span style="font-size:12px;color:#9E9E9E">최근 {_n_w}개월</span>',
                 x=0, xanchor="left",
                 font=dict(size=14, family=FONT, color="#212121"),
                 pad=dict(l=4),
             ),
             plot_bgcolor="#F9FAFB", paper_bgcolor="#FFFFFF",
-            margin=dict(t=44, b=8, l=4, r=60),
-            height=420,
-            bargap=0.35,
-            legend=dict(orientation="h", x=1, xanchor="right", y=1.06,
-                        font=dict(size=10, family=FONT), bgcolor="rgba(0,0,0,0)"),
-            yaxis=dict(gridcolor="#EEEEEE", zeroline=False, showticklabels=False,
-                       range=[0, _mo_max * 1.65], showline=False),
-            yaxis2=dict(overlaying="y", side="right", range=[0, _cu_max * 1.2],
-                        tickformat=".1f", ticksuffix="억",
-                        tickfont=dict(size=9, color="#E65100"),
-                        showgrid=False, title=None, showline=False),
-            xaxis=dict(showgrid=False, tickfont=dict(size=9.5, family=FONT), showline=False,
-                       tickangle=-40 if len(_mo_window) > 12 else -30),
+            margin=dict(l=4, r=80, t=44, b=8),
+            height=max(300, _n_w * 34 + 80),
+            xaxis=dict(
+                range=[0, _x_max * 1.38],
+                tickformat=".1f", ticksuffix="억",
+                showgrid=True, gridcolor="#EEEEEE",
+                zeroline=True, zerolinecolor="#E0E0E0", zerolinewidth=1,
+                tickfont=dict(size=9, color="#BDBDBD"),
+                showline=False,
+            ),
+            yaxis=dict(
+                tickfont=dict(size=10, family=FONT, color="#424242"),
+                showgrid=False, automargin=True,
+            ),
             font=dict(family=FONT),
         )
-        # 단위: 오른쪽 위
         fig.add_annotation(
             x=1, y=1.03, xref="paper", yref="paper",
             text="단위: 억원",
