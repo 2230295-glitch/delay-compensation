@@ -968,8 +968,7 @@ with tab_agg:
                     y=_bu_all["사업부"],
                     x=_bu_all["지체보상금"] / 1e8,
                     orientation="h",
-                    marker_color=_bu_colors,
-                    marker_line_width=0,
+                    marker=dict(color=_bu_colors, line_width=0, cornerradius=6),
                     text=[f'{v/1e8:.2f}억' if v >= 1e6 else (f'{v/1e4:.0f}만' if v > 0 else "")
                           for v in _bu_all["지체보상금"]],
                     textposition="outside",
@@ -1081,7 +1080,7 @@ with tab_agg:
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=x_w, y=y_w, name="월 발생",
-            marker_color=bar_colors_w, marker_line_width=0,
+            marker=dict(color=bar_colors_w, line_width=0, cornerradius=4),
             text=[f"{v:.2f}억" if v > 0 else "" for v in y_w],
             textposition="outside", cliponaxis=False,
             textfont=dict(size=9, color="#546e7a"),
