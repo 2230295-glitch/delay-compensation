@@ -961,7 +961,6 @@ with tab_agg:
                                "#26C6DA","#FFA726","#EC407A","#8D6E63","#78909C"]
                 _bu_colors = [_bu_palette[i % len(_bu_palette)] for i in range(len(_bu_df))]
                 _x_max = _bu_df["지체보상금"].max()
-                _tick_max = _x_max * 1.3
                 _fig_bu = go.Figure(go.Bar(
                     y=_bu_df["사업부"],
                     x=_bu_df["지체보상금"] / 1e8,
@@ -974,34 +973,25 @@ with tab_agg:
                     textfont=dict(size=10, family=FONT),
                 ))
                 _fig_bu.update_layout(
-                    annotations=[dict(
-                        x=0, y=1.06, xref="paper", yref="paper",
-                        text=f"<b>사업부별 지체보상금</b>  <span style='color:#9E9E9E;font-size:11px'>{_bu_yr}년 누계</span>",
-                        showarrow=False, xanchor="left", font=dict(size=13, family=FONT),
-                    ), dict(
-                        x=0, y=1.01, xref="paper", yref="paper",
-                        text="단위: 억원",
-                        showarrow=False, xanchor="left",
-                        font=dict(size=10, color="#9E9E9E", family=FONT),
-                    )],
-                    margin=dict(l=0, r=70, t=55, b=10),
-                    height=max(260, len(_bu_df) * 28 + 80),
-                    paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+                    margin=dict(l=0, r=70, t=8, b=8),
+                    height=max(240, len(_bu_df) * 36 + 40),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     xaxis=dict(
-                        range=[0, _tick_max / 1e8],
+                        range=[0, _x_max / 1e8 * 1.35],
                         tickformat=".1f",
                         ticksuffix="억",
                         showgrid=True, gridcolor="#F0F0F0", zeroline=False,
-                        tickfont=dict(size=9, color="#9E9E9E"),
+                        tickfont=dict(size=9, color="#BDBDBD"),
                         showline=False,
                     ),
                     yaxis=dict(
-                        tickfont=dict(size=10, family=FONT),
+                        tickfont=dict(size=11, family=FONT),
                         showgrid=False,
                         automargin=True,
                     ),
                     font=dict(family=FONT),
                 )
+                st.markdown('<div style="font-size:.7rem;color:#BDBDBD;margin-bottom:.2rem">단위: 억원 &nbsp;·&nbsp; 전체 기간 누계</div>', unsafe_allow_html=True)
                 st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
             else:
                 st.caption("사업부 정보 없음")
