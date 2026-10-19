@@ -772,6 +772,7 @@ MO_FOLDER = Path("input/월별잔고회전일")
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
 CT_LIST   = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
 CT_PATH   = CT_LIST[0] if CT_LIST else None
+CT_CSV    = Path("input/계약정보/계약_매핑결과.csv")
 
 @st.cache_data(show_spinner=False)
 def _read_mo_folder(folder_str: str, _mtime: float = 0):
@@ -797,6 +798,7 @@ m_b, _mo_names = _mo_result if _mo_result else (None, [])
 b_b = _read_bytes(str(BASE_PATH))
 c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
 t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
+csv_b = CT_CSV.read_bytes() if CT_CSV.exists() else None
 
 def _build_org_map(m_b):
     if not m_b: return {}
@@ -816,47 +818,44 @@ def _build_org_map(m_b):
     except Exception: return {}
 
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b, t_b):
+def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
     sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
     sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
-    cmap = n_yes = n_no = None
+
+    # 계약 매핑: CSV 우선 사용 → Excel 이름매칭 보완
+    cmap = {}
+    n_yes = n_no = 0
+    if csv_b:
+        import csv as _csv
+        _reader = _csv.DictReader(io.StringIO(csv_b.decode("utf-8-sig")))
+        for row in _reader:
+            code = str(row.get("판매처코드","")).strip()
+            if not code: continue
+            is_yes = str(row.get("지체여부","")).strip().lower() == "true"
+            try: rate = float(row.get("요율") or 0.001)
+            except: rate = 0.001
+            cmap[code] = {"지체여부": is_yes, "요율": rate,
+                          "계약유형": "", "사업자번호": ""}
+            if is_yes: n_yes += 1
+            else: n_no += 1
     if c_b:
-        cmap, n_yes, n_no = load_contract(c_b, sap_raw)
-    think_rot = load_think(t_b) if t_b else None
-    bdf = load_base(b_b, cmap, think_rot)
-    months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
-    if t_b and m_b:
-        sap_months = load_monthly(m_b)
-        _씽크ch = {"씽크", "DW11", "DW12"}
-        # SAP balance lookup for Think entries (non-씽크 rows in Think months)
-        sap_bal: dict = {}
-        for _me in sap_months:
-            for _, _r in _me["data"].iterrows():
-                _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
-                sap_bal[_k] = (int(_r["잔고"]), int(_r["현회전일"]))
-        for _me in months:
-            _df = _me["data"].copy()
-            for _i, _r in _df[~_df["채널"].isin(_씽크ch)].iterrows():
-                _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
-                if _k in sap_bal:
-                    _df.at[_i, "잔고"] = sap_bal[_k][0]
-                    _df.at[_i, "현회전일"] = sap_bal[_k][1]
-                else:
-                    _df.at[_i, "잔고"] = 0
-            _me["data"] = _df[_df["잔고"] > 0].reset_index(drop=True)
-        # DW07(오프라인) 월별 데이터를 Think 월별 목록에 병합
-        think_keys = {(_me["yr"], _me["mo"]): _me for _me in months}
-        for _sme in sap_months:
-            _dw07 = _sme["data"][~_sme["data"]["채널"].isin(_씽크ch)].copy()
-            if _dw07.empty:
-                continue
-            _key = (_sme["yr"], _sme["mo"])
-            if _key in think_keys:
-                think_keys[_key]["data"] = pd.concat(
-                    [think_keys[_key]["data"], _dw07], ignore_index=True)
+        _cmap_xl, _ny, _nn = load_contract(c_b, sap_raw)
+        for code, info in _cmap_xl.items():
+            if code not in cmap:
+                cmap[code] = info
+                if info["지체여부"]: n_yes += 1
+                else: n_no += 1
             else:
-                months.append({"yr": _sme["yr"], "mo": _sme["mo"], "data": _dw07})
-        months.sort(key=lambda x: (x["yr"], x["mo"]))
+                # CSV에 있는 코드 → 계약유형/사업자번호만 Excel에서 보완
+                cmap[code]["계약유형"]  = info.get("계약유형", "")
+                cmap[code]["사업자번호"] = info.get("사업자번호", "")
+
+    # 기준회전일 (씽크 파일의 회전일 오버라이드 반영)
+    think_rot = load_think(t_b) if t_b else None
+    bdf = load_base(b_b, cmap if cmap else None, think_rot)
+
+    # 월별 데이터: 항상 SAP 파일 사용 (DW07/DW11 채널 모두 포함)
+    months = load_monthly(m_b)
     org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
     if org_map and not result.empty:
@@ -890,7 +889,7 @@ if not (m_b and b_b):
     st.stop()
 
 with st.spinner("데이터 계산 중..."):
-    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b)
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
