@@ -95,27 +95,29 @@ section[data-testid="stSidebar"] { display: none !important; }
 .sec-sub { font-size: .72rem; color: #9ca3af; font-weight: 400; margin-left: .3rem; }
 
 /* ── KPI 카드 ── */
-.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .9rem; margin-bottom: 1.2rem; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .75rem; margin-bottom: 1.1rem; }
 .kpi-card {
-  background: #fff; border-radius: 10px;
-  padding: 1.1rem 1.3rem 1rem;
+  background: #fff; border-radius: 8px;
+  padding: 1rem 1.2rem .9rem;
   border: 1px solid #e8eaf0;
-  border-left: 4px solid #e8eaf0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  border-bottom: 3px solid #e8eaf0;
   transition: box-shadow .15s;
 }
-.kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-.kpi-card.c-amber  { border-left-color: #f59e0b; }
-.kpi-card.c-red    { border-left-color: #ef4444; }
-.kpi-card.c-blue   { border-left-color: #3b82f6; }
-.kpi-card.c-green  { border-left-color: #10b981; }
-.kpi-card.c-indigo { border-left-color: #6366f1; }
-.kpi-card.c-violet { border-left-color: #8b5cf6; }
+.kpi-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.09); }
+.kpi-card.c-amber  { border-bottom-color: #f5a000; }
+.kpi-card.c-red    { border-bottom-color: #ef4444; }
+.kpi-card.c-blue   { border-bottom-color: #3b82f6; }
+.kpi-card.c-green  { border-bottom-color: #10b981; }
+.kpi-card.c-indigo { border-bottom-color: #6366f1; }
+.kpi-card.c-violet { border-bottom-color: #8b5cf6; }
 
-.kpi-lbl  { font-size: .72rem; font-weight: 600; color: #6b7280; margin-bottom: .4rem; letter-spacing: .01em; }
-.kpi-val  { font-size: 2rem; font-weight: 800; color: #111827; line-height: 1.05; }
-.kpi-unit { font-size: 1rem; font-weight: 600; color: #374151; margin-left: .05rem; }
-.kpi-delta { font-size: .73rem; margin-top: .32rem; color: #9ca3af; }
+.kpi-lbl  { font-size: .7rem; font-weight: 600; color: #9ca3af; margin-bottom: .35rem; letter-spacing: .02em; text-transform: uppercase; }
+.kpi-val  { font-size: 2.6rem; font-weight: 800; color: #111827; line-height: 1; letter-spacing: -.03em; }
+.kpi-val.c-amber { color: #f5a000; }
+.kpi-val.c-red   { color: #ef4444; }
+.kpi-val.c-blue  { color: #3b82f6; }
+.kpi-unit { font-size: 1.1rem; font-weight: 700; margin-left: .1rem; }
+.kpi-delta { font-size: .72rem; margin-top: .4rem; color: #9ca3af; line-height: 1.5; }
 .up   { color: #ef4444 !important; font-weight: 700; }
 .dn   { color: #3b82f6 !important; font-weight: 700; }
 .neu  { color: #9ca3af !important; }
@@ -190,17 +192,18 @@ button[kind="secondary"]:hover {
 
 /* ── 변동 카드 ── */
 .chg-block {
-  background: #fff; border-radius: 10px;
-  border: 1px solid #e5e7eb; border-top: 3px solid #e5e7eb;
-  padding: 1rem 1.1rem; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  background: #fff; border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
-.chg-block.new   { border-top-color: #ef4444; }
-.chg-block.add   { border-top-color: #f59e0b; }
-.chg-block.done  { border-top-color: #10b981; }
+.chg-block .chg-inner { padding: .85rem 1rem; }
+.chg-block.new  .chg-head { background: #fef2f2; border-bottom: 1px solid #fecaca; padding: .65rem 1rem; }
+.chg-block.add  .chg-head { background: #fffbeb; border-bottom: 1px solid #fde68a; padding: .65rem 1rem; }
+.chg-block.done .chg-head { background: #f0fdf4; border-bottom: 1px solid #bbf7d0; padding: .65rem 1rem; }
 .chg-head {
-  display: flex; align-items: baseline; gap: .4rem; margin-bottom: .55rem;
+  display: flex; align-items: baseline; gap: .4rem;
 }
-.chg-name { font-size: .86rem; font-weight: 700; }
+.chg-name { font-size: .85rem; font-weight: 700; }
 .chg-cnt  { font-size: .73rem; color: #6b7280; }
 .chg-item {
   display: flex; justify-content: space-between; align-items: center;
@@ -232,22 +235,25 @@ button[kind="secondary"]:hover {
 
 /* ── 집계 테이블 ── */
 .agg-tbl { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.agg-tbl thead tr { background: #1f2937; }
 .agg-tbl th {
-  background: #f9fafb; font-weight: 700; font-size: .73rem;
-  color: #6b7280; padding: .6rem .9rem; text-align: right;
-  border-bottom: 1.5px solid #e5e7eb; white-space: nowrap;
+  background: #1f2937; font-weight: 700; font-size: .73rem;
+  color: #e5e7eb; padding: .7rem .9rem; text-align: right;
+  white-space: nowrap;
 }
-.agg-tbl th:first-child { text-align: left; }
+.agg-tbl th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+.agg-tbl th:last-child  { border-radius: 0 6px 0 0; }
 .agg-tbl td {
-  padding: .5rem .9rem; border-bottom: 1px solid #f3f4f6;
+  padding: .55rem .9rem; border-bottom: 1px solid #f3f4f6;
   color: #374151; text-align: right; white-space: nowrap;
 }
 .agg-tbl td:first-child { text-align: left; font-weight: 600; color: #111827; }
 .agg-tbl tr:last-child td {
-  background: #eff6ff; font-weight: 800; color: #1d4ed8; border-top: 2px solid #bfdbfe;
+  background: #1f2937; font-weight: 800; color: #fff; border-top: none;
 }
-.agg-tbl tr:hover td { background: #fef9ee; }
-.agg-tbl .has-val { color: #92400e; font-weight: 700; }
+.agg-tbl tr:nth-child(even) td { background: #fafafa; }
+.agg-tbl tr:hover td { background: #fff7ed !important; }
+.agg-tbl .has-val { color: #c2410c; font-weight: 700; }
 .agg-tbl .zero    { color: #d1d5db; }
 
 /* ── dataframe ── */
@@ -830,7 +836,7 @@ with tab_agg:
     <div class="kpi-grid">
       <div class="kpi-card c-amber">
         <div class="kpi-lbl">전체 기간 지체보상금</div>
-        <div class="kpi-val">{fmt_won(total_all,short=True)}</div>
+        <div class="kpi-val c-amber">{fmt_won(total_all,short=True)}</div>
         <div class="kpi-delta">{months_sorted[0]} ~ {months_sorted[-1]}</div>
       </div>
       <div class="kpi-card c-indigo">
@@ -840,7 +846,7 @@ with tab_agg:
       </div>
       <div class="kpi-card c-red">
         <div class="kpi-lbl">전체 기간 청구 거래처</div>
-        <div class="kpi-val">{total_vend}<span class="kpi-unit">개</span></div>
+        <div class="kpi-val c-red">{total_vend}<span class="kpi-unit">개</span></div>
         <div class="kpi-delta">지체보상금 발생 고유 거래처 수</div>
       </div>
       <div class="kpi-card c-green">
@@ -1040,12 +1046,12 @@ with tab_detail:
     <div class="kpi-grid">
       <div class="kpi-card c-amber">
         <div class="kpi-lbl">{mo_label(sel)} 지체보상금</div>
-        <div class="kpi-val">{fmt_won(sel_total,short=True)}</div>
+        <div class="kpi-val c-amber">{fmt_won(sel_total,short=True)}</div>
         <div class="kpi-delta">{d_html}</div>
       </div>
       <div class="kpi-card c-red">
         <div class="kpi-lbl">청구 건수</div>
-        <div class="kpi-val">{sel_n}<span class="kpi-unit">건</span></div>
+        <div class="kpi-val c-red">{sel_n}<span class="kpi-unit">건</span></div>
         <div class="kpi-delta">{_d(sel_n,prev_n,"건")}</div>
       </div>
       <div class="kpi-card c-blue">
@@ -1094,7 +1100,7 @@ with tab_detail:
         cnt_badge=f'<span class="chg-cnt">{len(lst)}건 · {fmt_won(total,short=True)}</span>'
         return (f'<div class="chg-block {cls}">'
                 f'<div class="chg-head"><span class="chg-name" style="color:{color}">{title}</span>{cnt_badge}</div>'
-                f'{items}</div>')
+                f'<div class="chg-inner">{items}</div></div>')
 
     cc1,cc2,cc3=st.columns(3,gap="medium")
     with cc1: st.markdown(_card(_신규,"new",f"{mo_label(sel)} 신규 연체","#ef4444"),unsafe_allow_html=True)
