@@ -60,7 +60,7 @@ section[data-testid="stSidebar"] { display: none !important; }
   border-bottom: 1px solid #E0E0E0;
 }
 .hd-left { display: flex; flex-direction: column; gap: .15rem; }
-.hd-title { font-size: 1.05rem; font-weight: 700; color: #212121; letter-spacing: -.02em; }
+.hd-title { font-size: 1.18rem; font-weight: 700; color: #212121; letter-spacing: -.02em; }
 .hd-sub   { font-size: .72rem; color: #9E9E9E; margin-top: .05rem; }
 .hd-badge {
   background: #FFF3E0; color: #E65100;
@@ -199,6 +199,40 @@ button[kind="secondary"]:hover {
 }
 .rank-bar-bg { background: #F5F5F5; border-radius: 2px; height: 5px; margin-top: .22rem; overflow: hidden; }
 .rank-bar-fg { height: 100%; border-radius: 2px; }
+
+/* ── 랭킹 카드 래퍼 ── */
+.rank-card {
+  background: #fff; border: 1px solid #E0E0E0; border-radius: 6px;
+  padding: .5rem .85rem; overflow-y: auto; max-height: 420px;
+}
+.rank-empty {
+  color: #BDBDBD; text-align: center; font-size: .85rem; padding: 3rem 0;
+}
+
+/* ── 검색창 ── */
+[data-testid="stTextInput"] > div > div {
+  background: #fff !important;
+  border: 1.5px solid #E0E0E0 !important;
+  border-radius: 6px !important;
+}
+[data-testid="stTextInput"] > div > div:focus-within {
+  border-color: #F57C00 !important;
+  box-shadow: 0 0 0 3px rgba(245,124,0,.12) !important;
+}
+[data-testid="stTextInput"] input {
+  font-size: .85rem !important;
+  color: #212121 !important;
+}
+
+/* ── 다운로드 섹션 ── */
+.dl-card {
+  background: #fff; border: 1px solid #E0E0E0; border-radius: 6px;
+  padding: .9rem 1rem; margin-bottom: .5rem;
+}
+.dl-card-title {
+  font-size: .72rem; font-weight: 700; color: #9E9E9E;
+  letter-spacing: .04em; text-transform: uppercase; margin-bottom: .6rem;
+}
 
 /* ── 집계 테이블 ── */
 .agg-tbl { width: 100%; border-collapse: collapse; font-size: .83rem; }
@@ -1111,15 +1145,19 @@ with tab_detail:
     def _delta_html(cur, prv, unit="원"):
         if prv == 0: return '<span style="color:#94a3b8">— 전월 없음</span>'
         d = cur - prv
-        if d == 0: return '<span style="color:#94a3b8">± 0 전월 동일</span>'
+        if d == 0: return '<span style="color:#BDBDBD">전월 동일</span>'
         arr = "▲" if d > 0 else "▼"
         cls = "kpi-up" if d > 0 else "kpi-dn"
         val = fmt_won(abs(d)) if unit == "원" else f"{abs(d)}{unit}"
-        return f'<span class="{cls}">{arr} {val} vs 전월</span>'
+        return f'전월 <span class="{cls}">{arr} {val}</span>'
 
     d_amt = sel_total - prev_total
-    d_html = (f'<span class="{"kpi-up" if d_amt>0 else "kpi-dn"}">{"▲" if d_amt>0 else "▼"} {fmt_won(abs(d_amt))} vs 전월</span>'
-              if d_amt != 0 and prev_total > 0 else '<span style="color:#94a3b8">— 전월 없음</span>')
+    if d_amt != 0 and prev_total > 0:
+        _arr = "▲" if d_amt > 0 else "▼"
+        _cls = "kpi-up" if d_amt > 0 else "kpi-dn"
+        d_html = f'전월 <span class="{_cls}">{_arr} {fmt_won(abs(d_amt))}</span>'
+    else:
+        d_html = '<span style="color:#BDBDBD">전월 데이터 없음</span>'
 
     # ── 월 KPI ──────────────────────────────────────────────
     st.markdown(f"""
@@ -1199,27 +1237,26 @@ with tab_detail:
         rank_colors = ["#ef4444","#f97316","#f59e0b","#84cc16","#22c55e",
                        "#14b8a6","#3b82f6","#6366f1","#8b5cf6","#ec4899"]
         if charge.empty:
-            st.markdown('<div style="text-align:center;color:#94a3b8;padding:3rem 0;font-size:.88rem">해당 월 청구 발생 없음</div>', unsafe_allow_html=True)
+            st.markdown('<div class="rank-card"><div class="rank-empty">해당 월 청구 발생 없음</div></div>', unsafe_allow_html=True)
         else:
             items_html = ""
             for i, row in charge.iterrows():
                 v = int(row["지체보상금"])
                 pct = min(v / all_max * 100, 100)
-                color = rank_colors[i] if i < len(rank_colors) else "#94a3b8"
+                color = rank_colors[i] if i < len(rank_colors) else "#9E9E9E"
                 org = str(row.get("사무소","")).strip()
                 if not org or org in ("nan",""):
                     org = str(row.get("사업부","")).strip()
-                org_badge = (f'<span class="badge badge-gray">{org}</span>') if org and org not in ("nan","") else ""
-                items_html += f"""
-                <div class="rank-item">
+                org_txt = f'<span style="font-size:.68rem;color:#BDBDBD;margin-left:.3rem">{org}</span>' if org and org not in ("nan","") else ""
+                items_html += f"""<div class="rank-item">
                   <span class="rank-badge" style="background:{color}">{i+1}</span>
-                  <div>
-                    <div style="font-size:.84rem;font-weight:600;color:#1e293b">{row["판매처명"]}{org_badge}</div>
+                  <div style="min-width:0">
+                    <div style="font-size:.83rem;font-weight:600;color:#212121;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row["판매처명"]}{org_txt}</div>
                     <div class="rank-bar-bg"><div class="rank-bar-fg" style="background:{color};width:{pct:.1f}%"></div></div>
                   </div>
-                  <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v, short=True)}</div>
+                  <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color};flex-shrink:0">{fmt_won(v, short=True)}</div>
                 </div>"""
-            st.markdown(f'<div style="padding:.1rem 0">{items_html}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="rank-card">{items_html}</div>', unsafe_allow_html=True)
 
     with right_col:
         st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{_sel_yr}년 월별 추이</div>', unsafe_allow_html=True)
@@ -1283,48 +1320,59 @@ with tab_detail:
     all_charge_df = result_df[result_df["지체보상금"] > 0]
     n_vendors = all_charge_df["판매처코드"].nunique()
 
-    st.markdown('<div class="sec-hd"><span class="sec-bar"></span>다운로드</div>', unsafe_allow_html=True)
-    dc1, dc2, dc3, dc4 = st.columns(4)
+    st.markdown('<div class="sec-hd"><span class="sec-bar"></span>파일 다운로드</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dl-card">'
+                '<div class="dl-card-title">엑셀 데이터</div>', unsafe_allow_html=True)
+    dc1, dc2 = st.columns(2)
     with dc1:
         st.download_button(
-            f"⬇ {mo_label(sel)} 발생현황 엑셀",
+            f"📊 {mo_label(sel)} 발생현황",
             data=make_excel(charge_only, f"{mo_label(sel)}"),
             file_name=f"지체보상금_{sel.replace('-','')}_발생현황.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True, key="btn_dl_mo_excel",
+            help=f"{mo_label(sel)} 청구 발생 거래처 내역",
         )
     with dc2:
         st.download_button(
-            "⬇ 전체 기간 엑셀",
+            "📋 전체 기간 통합본",
             data=make_full_excel(result_df),
             file_name=f"지체보상금_전체_{date.today():%Y%m%d}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True, key="btn_dl_full_excel",
+            help="전체 기간 내역 + 거래처별 피벗",
         )
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dl-card" style="margin-top:.5rem">'
+                '<div class="dl-card-title">공문 (Word .docx)</div>', unsafe_allow_html=True)
+    dc3, dc4 = st.columns(2)
     with dc3:
         st.download_button(
-            f"📄 {mo_label(sel)} 공문 ({n_charge}건)" if n_charge else "📄 공문 없음",
+            f"📄 {mo_label(sel)} 청구 공문 ({n_charge}건)" if n_charge else f"📄 {mo_label(sel)} 청구 없음",
             data=make_공문_zip(charge_only, mo_label(sel)) if n_charge else b"",
             file_name=f"지체보상금_공문_{sel.replace('-','')}.zip",
             mime="application/zip",
             disabled=(n_charge == 0),
             use_container_width=True, key="btn_dl_mo_docx",
+            help=f"{mo_label(sel)} 발생 거래처 개별 공문 ZIP",
         )
     with dc4:
         st.download_button(
-            f"📁 거래처별 전체기간 공문 ({n_vendors}개사)",
+            f"📁 전체기간 누적 공문 ({n_vendors}개사)",
             data=make_공문_zip_cumulative(result_df) if n_vendors else b"",
             file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
             mime="application/zip",
             disabled=(n_vendors == 0),
             use_container_width=True, key="btn_dl_all_docx",
+            help="전체 기간 거래처별 누적 공문 ZIP",
         )
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── 상세 테이블 ──────────────────────────────────────────
     st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 상세 내역</div>', unsafe_allow_html=True)
 
     fc1, fc2 = st.columns([5, 1])
-    kw     = fc1.text_input("거래처명 검색", placeholder="거래처명으로 검색",
+    kw     = fc1.text_input("거래처명 검색", placeholder="🔍  거래처명으로 검색",
                             label_visibility="collapsed", key="kw1")
     only_c = fc2.checkbox("청구만", key="oc1")
     view   = sel_df.copy()
