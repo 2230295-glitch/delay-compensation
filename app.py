@@ -71,7 +71,7 @@ section[data-testid="stSidebar"] { display: none !important; }
 /* ── 탭 ── */
 [data-baseweb="tab-list"] {
   background: #fff !important;
-  border-radius: 6px 6px 0 0 !important;
+  border-radius: 10px 10px 0 0 !important;
   border: 1px solid #E0E0E0 !important;
   border-bottom: none !important;
   padding: 0 .5rem !important;
@@ -93,18 +93,18 @@ section[data-testid="stSidebar"] { display: none !important; }
   background: #fff !important;
   border: 1px solid #E0E0E0 !important;
   border-top: none !important;
-  border-radius: 0 0 6px 6px !important;
+  border-radius: 0 0 10px 10px !important;
   padding: 1.2rem 1.4rem !important;
 }
 
 /* ── KPI 카드 ── */
 .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 1.2rem; }
 .kpi-card {
-  background: #fff; border-radius: 6px;
+  background: #fff; border-radius: 10px;
   padding: .95rem 1.1rem .9rem 1rem;
   border: 1px solid #E8E8E8;
   border-left: 4px solid #E0E0E0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
 .kpi-card.orange { border-left-color: #F57C00; }
 .kpi-card.red    { border-left-color: #E53E3E; }
@@ -171,7 +171,7 @@ button[kind="secondary"]:hover {
 
 /* ── 변동 카드 (신규/추가/수금) ── */
 .chg-card {
-  background: #fff; border-radius: 6px;
+  background: #fff; border-radius: 10px;
   border: 1px solid #E0E0E0;
   overflow: hidden;
 }
@@ -212,7 +212,7 @@ button[kind="secondary"]:hover {
 
 /* ── 랭킹 카드 래퍼 ── */
 .rank-card {
-  background: #fff; border: 1px solid #E0E0E0; border-radius: 6px;
+  background: #fff; border: 1px solid #E0E0E0; border-radius: 10px;
   padding: .5rem .85rem; overflow-y: auto; max-height: 420px;
 }
 .rank-empty {
@@ -236,7 +236,7 @@ button[kind="secondary"]:hover {
 
 /* ── 다운로드 섹션 ── */
 .dl-card {
-  background: #fff; border: 1px solid #E0E0E0; border-radius: 6px;
+  background: #fff; border: 1px solid #E0E0E0; border-radius: 10px;
   padding: .9rem 1rem; margin-bottom: .5rem;
 }
 .dl-card-title {
@@ -950,49 +950,64 @@ with tab_agg:
 
     with ins2:
         _bu_yr = months_sorted[-1][:4] if months_sorted else cur_yr
-        st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
+        _bu_last_mo = mo_label(months_sorted[-1]) if months_sorted else ""
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
         if "사업부" in result_df.columns:
-            _bu_df = (result_df[result_df["사업부"].str.strip().ne("") & result_df["사업부"].notna()]
-                      .groupby("사업부")["지체보상금"].sum()
-                      .reset_index().sort_values("지체보상금"))
-            _bu_df = _bu_df[_bu_df["지체보상금"] > 0]
-            if not _bu_df.empty:
+            _bu_all = (result_df[result_df["사업부"].str.strip().ne("") & result_df["사업부"].notna()]
+                       .groupby("사업부")["지체보상금"].sum().reset_index())
+            _bu_all = _bu_all.sort_values("지체보상금", ascending=True)  # 하단부터 큰 값
+            if not _bu_all.empty:
                 _bu_palette = ["#F57C00","#EF5350","#42A5F5","#66BB6A","#AB47BC",
-                               "#26C6DA","#FFA726","#EC407A","#8D6E63","#78909C"]
-                _bu_colors = [_bu_palette[i % len(_bu_palette)] for i in range(len(_bu_df))]
-                _x_max = _bu_df["지체보상금"].max()
+                               "#26C6DA","#FFA726","#EC407A","#8D6E63","#78909C",
+                               "#5C6BC0","#26A69A"]
+                _n = len(_bu_all)
+                _bu_colors = [_bu_palette[i % len(_bu_palette)] for i in range(_n)]
+                _x_max = _bu_all["지체보상금"].max()
+
                 _fig_bu = go.Figure(go.Bar(
-                    y=_bu_df["사업부"],
-                    x=_bu_df["지체보상금"] / 1e8,
+                    y=_bu_all["사업부"],
+                    x=_bu_all["지체보상금"] / 1e8,
                     orientation="h",
                     marker_color=_bu_colors,
-                    text=[f'{v/1e8:.2f}억' if v >= 1e6 else fmt_won(v, short=True)
-                          for v in _bu_df["지체보상금"]],
+                    marker_line_width=0,
+                    text=[f'{v/1e8:.2f}억' if v >= 1e6 else (f'{v/1e4:.0f}만' if v > 0 else "")
+                          for v in _bu_all["지체보상금"]],
                     textposition="outside",
                     cliponaxis=False,
-                    textfont=dict(size=10, family=FONT),
+                    textfont=dict(size=10, color="#546e7a", family=FONT),
                 ))
                 _fig_bu.update_layout(
-                    margin=dict(l=0, r=70, t=8, b=8),
-                    height=max(240, len(_bu_df) * 36 + 40),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    title=dict(
+                        text=f'<b>사업부별 지체보상금</b>  <span style="font-size:12px;color:#9E9E9E">{_bu_yr}년 누계</span>',
+                        x=0, xanchor="left",
+                        font=dict(size=14, family=FONT, color="#212121"),
+                        pad=dict(l=4),
+                    ),
+                    margin=dict(l=4, r=70, t=42, b=8),
+                    height=max(260, _n * 38 + 70),
+                    paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
                     xaxis=dict(
-                        range=[0, _x_max / 1e8 * 1.35],
-                        tickformat=".1f",
-                        ticksuffix="억",
-                        showgrid=True, gridcolor="#F0F0F0", zeroline=False,
+                        range=[0, _x_max / 1e8 * 1.38],
+                        tickformat=".1f", ticksuffix="억",
+                        showgrid=True, gridcolor="#F5F5F5",
+                        zeroline=True, zerolinecolor="#E0E0E0", zerolinewidth=1,
                         tickfont=dict(size=9, color="#BDBDBD"),
                         showline=False,
                     ),
                     yaxis=dict(
-                        tickfont=dict(size=11, family=FONT),
-                        showgrid=False,
-                        automargin=True,
+                        tickfont=dict(size=10, family=FONT, color="#424242"),
+                        showgrid=False, automargin=True,
                     ),
                     font=dict(family=FONT),
                 )
-                st.markdown('<p style="font-size:.7rem;color:#BDBDBD;margin:0 0 .2rem">단위: 억원 &nbsp;·&nbsp; 전체 기간 누계</p>', unsafe_allow_html=True)
-                _fig_bu.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF")
+                # 단위 서브타이틀
+                _fig_bu.add_annotation(
+                    x=0, y=1.0, xref="paper", yref="paper",
+                    text="단위: 억원",
+                    showarrow=False, xanchor="left",
+                    font=dict(size=10, color="#BDBDBD", family=FONT),
+                    yanchor="bottom",
+                )
                 st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
             else:
                 st.caption("사업부 정보 없음")
