@@ -336,11 +336,16 @@ def load_contract(file_bytes, sap_df):
         no_val = row[0]
         if not str(no_val or '').strip().isdigit(): continue
 
-        code  = str(row[FIXED["code"]] or '').strip()
-        name  = str(row[FIXED["name"]] or '').strip()
-        ctype = str(row[FIXED["type"]] or '').strip()
-        biz   = str(row[FIXED["biz"]]  or '').strip()
-        y_val = str(row[FIXED["jiche"]] or '').strip() if len(row) > FIXED["jiche"] else ''
+        def _cell(v):
+            if v is None: return ''
+            if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
+            if isinstance(v, int):   return str(v)
+            return str(v).strip()
+        code  = _cell(row[FIXED["code"]])
+        name  = _cell(row[FIXED["name"]])
+        ctype = _cell(row[FIXED["type"]])
+        biz   = _cell(row[FIXED["biz"]])
+        y_val = _cell(row[FIXED["jiche"]]) if len(row) > FIXED["jiche"] else ''
 
         is_yes = bool(y_val)
         rate_m = re.search(r'\[(\d+)/(\d+)\]', y_val)
