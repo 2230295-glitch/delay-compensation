@@ -282,7 +282,7 @@ button[kind="secondary"]:hover {
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
-ALLOW_CH       = {"DW04","DW07","DW08","DW09","DW10","DW11","DW17"}
+ALLOW_CH       = {"DW07","DW11"}   # 씽크(DW11) + 오프라인(DW07) 만 대상
 EXCLUDE_CODES  = {"10014461","C4900","C2000","C3100"}
 EXCLUDE_BU     = {"기타사업부","수탁사업부","완제사업부"}
 EXCLUDE_OFFICE = {"DW_B2B","DW_CH신사업팀"}
@@ -317,33 +317,62 @@ def _norm(s):
 def load_contract(file_bytes, sap_df):
     try:    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='계약서', dtype=str, header=5)
     except: df = pd.read_excel(io.BytesIO(file_bytes), dtype=str, header=5)
-    cols = ['No','병원명','계약유형','사업자번호','계약일자','계약병상','계약금액','계약기간',
-            '_8','대금지급','지체보상금조항','비고','_12']
-    df.columns = cols + [f'_e{i}' for i in range(max(0, len(df.columns)-len(cols)))]
-    df = df[df['No'].notna() & df['No'].astype(str).str.match(r'^\d+$', na=False)].copy()
-    df['지체여부'] = df['지체보상금조항'].apply(lambda x: '지체보상금' in str(x))
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # 실제 Excel 컬럼명으로 찾기 (유연하게)
+    def _fcol(*names):
+        for n in names:
+            for c in df.columns:
+                if n in c: return c
+        return None
+    col_no    = _fcol('No', 'NO', 'no')
+    col_name  = _fcol('병원명', '병원', '거래처명', '고객명')
+    col_code  = _fcol('거래처코드', '판매처코드', '고객코드', '코드')
+    col_type  = _fcol('계약유형', '유형')
+    col_biz   = _fcol('사업자번호', '사업자')
+    col_jiche = _fcol('지체보상금')
+
+    # 숫자 No. 행만 유지
+    if col_no:
+        df = df[df[col_no].notna() & df[col_no].astype(str).str.match(r'^\d+$', na=False)].copy()
+
+    df['지체여부'] = df[col_jiche].apply(lambda x: '지체보상금' in str(x)) if col_jiche else False
     def _rate(x):
         m = re.search(r'\[(\d+)/(\d+)\]', str(x))
         return float(m.group(1)) / float(m.group(2)) if m else 1/1000
-    df['요율'] = df['지체보상금조항'].apply(_rate)
-    df['_norm'] = df['병원명'].apply(_norm)
+    df['요율'] = df[col_jiche].apply(_rate) if col_jiche else 1/1000
+
+    # SAP 기준파일 이름→코드 매핑 (fallback)
     s2 = sap_df.copy(); s2['_norm'] = s2['판매처명'].apply(_norm)
     sm = dict(zip(s2['_norm'], s2['판매처']))
-    df['코드'] = df['_norm'].map(sm)
-    for idx, row in df[df['코드'].isna()].iterrows():
-        cn = row['_norm']
-        if len(cn) < 4: continue
-        for sn, sc in zip(s2['_norm'], s2['판매처']):
-            if len(sn) >= 4 and (cn in sn or sn in cn):
-                df.at[idx, '코드'] = sc; break
+
+    # 1차: 거래처코드 컬럼 직접 매핑
+    df['코드'] = None
+    if col_code:
+        _mask = df[col_code].notna() & (df[col_code].astype(str).str.strip() != '') & (df[col_code] != 'nan')
+        df.loc[_mask, '코드'] = df.loc[_mask, col_code].astype(str).str.strip()
+
+    # 2차: 이름 기반 매핑 (코드 없는 행)
+    if col_name:
+        df['_norm'] = df[col_name].apply(_norm)
+        _no_code = df['코드'].isna()
+        df.loc[_no_code, '코드'] = df.loc[_no_code, '_norm'].map(sm)
+        for idx, row in df[df['코드'].isna()].iterrows():
+            cn = row['_norm']
+            if len(cn) < 4: continue
+            for sn, sc in zip(s2['_norm'], s2['판매처']):
+                if len(sn) >= 4 and (cn in sn or sn in cn):
+                    df.at[idx, '코드'] = sc; break
+
     result = {}
     for _, r in df[df['코드'].notna()].iterrows():
-        c = r['코드']
-        if c not in result or not r['지체여부']:
+        c = str(r['코드']).strip()
+        if not c or c == 'nan': continue
+        if c not in result or not result[c]["지체여부"]:
             result[c] = {
-                "지체여부": r['지체여부'], "요율": r['요율'],
-                "계약유형": str(r.get('계약유형', '')).strip(),
-                "사업자번호": str(r.get('사업자번호', '')).strip(),
+                "지체여부": bool(r['지체여부']), "요율": float(r['요율']),
+                "계약유형":  str(r[col_type]).strip()  if col_type  and r[col_type]  not in (None,'nan') else "",
+                "사업자번호": str(r[col_biz]).strip()   if col_biz   and r[col_biz]   not in (None,'nan') else "",
             }
     n_yes = sum(1 for v in result.values() if v["지체여부"])
     n_no  = sum(1 for v in result.values() if not v["지체여부"])
@@ -361,7 +390,8 @@ def load_base(file_bytes, cmap=None, think_rotations=None):
         eff = (int(exc) if not pd.isna(exc) and exc > 0
                else (int(yak) if not pd.isna(yak) and yak > 0 else int(base)))
         info = (cmap or {}).get(code, {})
-        use = info.get("지체여부", True); rate = info.get("요율", 1/1000)
+        # cmap 제공 시 미등록 거래처는 지체 대상 아님 (계약 없음)
+        use = info.get("지체여부", cmap is None); rate = info.get("요율", 1/1000)
         out.append({"코드":code,"명칭":name,"기준회전일":int(base),
                     "유효기준회전일":eff,"지체여부":use,"요율":rate})
     existing = {r["코드"] for r in out}
@@ -369,7 +399,7 @@ def load_base(file_bytes, cmap=None, think_rotations=None):
         for code, rot in think_rotations.items():
             if code not in existing:
                 info = (cmap or {}).get(code, {})
-                use = info.get("지체여부", True); rate = info.get("요율", 1/1000)
+                use = info.get("지체여부", cmap is None); rate = info.get("요율", 1/1000)
                 out.append({"코드":code,"명칭":"","기준회전일":rot,
                             "유효기준회전일":rot,"지체여부":use,"요율":rate})
     return pd.DataFrame(out)
@@ -995,29 +1025,29 @@ with tab_agg:
                         font=dict(size=14, family=FONT, color="#212121"),
                         pad=dict(l=4),
                     ),
-                    margin=dict(l=4, r=70, t=42, b=8),
-                    height=max(260, _n * 38 + 70),
-                    paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+                    margin=dict(l=4, r=80, t=44, b=8),
+                    height=max(280, _n * 42 + 70),
+                    paper_bgcolor="#FFFFFF", plot_bgcolor="#F9FAFB",
                     xaxis=dict(
-                        range=[0, _x_max / 1e8 * 1.38],
+                        range=[0, _x_max / 1e8 * 1.40],
                         tickformat=".1f", ticksuffix="억",
-                        showgrid=True, gridcolor="#F5F5F5",
+                        showgrid=True, gridcolor="#EEEEEE",
                         zeroline=True, zerolinecolor="#E0E0E0", zerolinewidth=1,
                         tickfont=dict(size=9, color="#BDBDBD"),
                         showline=False,
                     ),
                     yaxis=dict(
-                        tickfont=dict(size=10, family=FONT, color="#424242"),
+                        tickfont=dict(size=10.5, family=FONT, color="#424242"),
                         showgrid=False, automargin=True,
                     ),
                     font=dict(family=FONT),
                 )
-                # 단위 서브타이틀
+                # 단위: 오른쪽 위
                 _fig_bu.add_annotation(
-                    x=0, y=1.0, xref="paper", yref="paper",
+                    x=1, y=1.03, xref="paper", yref="paper",
                     text="단위: 억원",
-                    showarrow=False, xanchor="left",
-                    font=dict(size=10, color="#BDBDBD", family=FONT),
+                    showarrow=False, xanchor="right",
+                    font=dict(size=10, color="#9E9E9E", family=FONT),
                     yanchor="bottom",
                 )
                 st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
@@ -1081,7 +1111,13 @@ with tab_agg:
 
         x_w  = [mo_label(m) for m in _mo_window]
         y_w  = [int(mo_sum.get(m, 0)) / 1e8 for m in _mo_window]
-        bar_colors_w = ["#F57C00" if v > 0 else "#E8E8E8" for v in y_w]
+
+        # 최근 6개월은 진한색, 나머지는 연한색
+        _n_w = len(_mo_window)
+        _bar_palette = ["#42A5F5","#5C6BC0","#66BB6A","#FFA726","#AB47BC","#26C6DA",
+                        "#EF5350","#8D6E63","#78909C","#26A69A","#EC407A","#FF7043"]
+        bar_colors_w = [_bar_palette[i % len(_bar_palette)] if v > 0 else "#E8E8E8"
+                        for i, v in enumerate(y_w)]
 
         # 누적은 전체 기간 기준으로 계산 후 윈도우 슬라이싱
         _cum_full, _run = [], 0
@@ -1093,39 +1129,53 @@ with tab_agg:
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=x_w, y=y_w, name="월 발생",
-            marker=dict(color=bar_colors_w, line_width=0, cornerradius=4),
-            text=[f"{v:.2f}억" if v > 0 else "" for v in y_w],
+            marker=dict(color=bar_colors_w, line_width=0, cornerradius=6),
+            text=[f"{v:.2f}억" if v >= 0.01 else "" for v in y_w],
             textposition="outside", cliponaxis=False,
-            textfont=dict(size=9, color="#546e7a"),
-            hovertemplate="<b>%{x}</b><br>%{y:.2f}억원<extra></extra>",
+            textfont=dict(size=9, color="#546e7a", family=FONT),
+            hovertemplate="<b>%{x}</b><br>월 발생: %{y:.2f}억원<extra></extra>",
             yaxis="y1",
         ))
         fig.add_trace(go.Scatter(
             x=x_w, y=[v if v > 0 else None for v in _cum_w], name="누적",
             mode="lines+markers",
-            line=dict(color="#F57C00", width=2.5, dash="solid"),
-            marker=dict(size=5, color="#F57C00", line=dict(color="#fff", width=1.5)),
-            hovertemplate="<b>%{x}</b><br>누적 %{y:.2f}억원<extra></extra>",
+            line=dict(color="#E65100", width=2, dash="solid"),
+            marker=dict(size=5, color="#E65100", line=dict(color="#fff", width=1.5)),
+            hovertemplate="<b>%{x}</b><br>누적: %{y:.2f}억원<extra></extra>",
             yaxis="y2",
         ))
         _mo_max = max(y_w) if any(v > 0 for v in y_w) else 1
         _cu_max = max(v for v in _cum_w if v) if any(v for v in _cum_w) else 1
         fig.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=10, b=10, l=10, r=55),
-            height=460,
-            bargap=0.38,
-            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.04,
-                        font=dict(size=11, family=FONT), bgcolor="rgba(0,0,0,0)"),
-            yaxis=dict(gridcolor="#F5F5F5", zeroline=False, showticklabels=False,
-                       range=[0, _mo_max * 1.7], showline=False),
+            title=dict(
+                text=f'<b>월별 지체보상금 추이</b>  <span style="font-size:12px;color:#9E9E9E">최근 {len(_mo_window)}개월</span>',
+                x=0, xanchor="left",
+                font=dict(size=14, family=FONT, color="#212121"),
+                pad=dict(l=4),
+            ),
+            plot_bgcolor="#F9FAFB", paper_bgcolor="#FFFFFF",
+            margin=dict(t=44, b=8, l=4, r=60),
+            height=420,
+            bargap=0.35,
+            legend=dict(orientation="h", x=1, xanchor="right", y=1.06,
+                        font=dict(size=10, family=FONT), bgcolor="rgba(0,0,0,0)"),
+            yaxis=dict(gridcolor="#EEEEEE", zeroline=False, showticklabels=False,
+                       range=[0, _mo_max * 1.65], showline=False),
             yaxis2=dict(overlaying="y", side="right", range=[0, _cu_max * 1.2],
                         tickformat=".1f", ticksuffix="억",
-                        tickfont=dict(size=9, color="#F57C00"),
+                        tickfont=dict(size=9, color="#E65100"),
                         showgrid=False, title=None, showline=False),
-            xaxis=dict(showgrid=False, tickfont=dict(size=10), showline=False,
-                       tickangle=-40 if len(_mo_window) > 12 else 0),
+            xaxis=dict(showgrid=False, tickfont=dict(size=9.5, family=FONT), showline=False,
+                       tickangle=-40 if len(_mo_window) > 12 else -30),
             font=dict(family=FONT),
+        )
+        # 단위: 오른쪽 위
+        fig.add_annotation(
+            x=1, y=1.03, xref="paper", yref="paper",
+            text="단위: 억원",
+            showarrow=False, xanchor="right",
+            font=dict(size=10, color="#9E9E9E", family=FONT),
+            yanchor="bottom",
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -1186,8 +1236,11 @@ with tab_detail:
     # ── 연도 / 월 선택기 ─────────────────────────────────────
     years_avail = sorted(set(m.split("-")[0] for m in months_sorted))
 
-    if "sel_mo" not in st.session_state or st.session_state.sel_mo not in months_sorted:
-        st.session_state.sel_mo = months_sorted[-1]
+    _today_tmp = date.today()
+    _unclosed_tmp = {f"{_today_tmp.year}-{mo:02d}" for mo in range(_today_tmp.month, 13)}
+    _avail_sorted = [m for m in months_sorted if m not in _unclosed_tmp] or months_sorted
+    if "sel_mo" not in st.session_state or st.session_state.sel_mo not in _avail_sorted:
+        st.session_state.sel_mo = _avail_sorted[-1]
     if "sel_yr" not in st.session_state or st.session_state.sel_yr not in years_avail:
         st.session_state.sel_yr = st.session_state.sel_mo.split("-")[0]
 
@@ -1205,6 +1258,10 @@ with tab_detail:
                     st.session_state.sel_mo = yr_months[-1]
                 st.rerun()
 
+    # 미마감 월: 당월 포함 이후는 클릭 불가
+    _today = date.today()
+    _unclosed = {f"{_today.year}-{mo:02d}" for mo in range(_today.month, 13)}
+
     # 월 버튼 (12개 그리드)
     st.markdown('<div style="margin-top:.3rem"><div class="yr-label">월 선택</div></div>', unsafe_allow_html=True)
     yr_months = [m for m in months_sorted if m.startswith(st.session_state.sel_yr)]
@@ -1215,24 +1272,26 @@ with tab_detail:
         mo = i + 1
         m = f"{st.session_state.sel_yr}-{mo:02d}"
         with mo_cols_row1[i]:
-            if m in yr_months_set:
+            if m in yr_months_set and m not in _unclosed:
                 if st.button(f"{mo}월", key=f"mo_{m}",
                              type="primary" if m == st.session_state.sel_mo else "secondary",
                              use_container_width=True):
                     st.session_state.sel_mo = m; st.rerun()
             else:
-                st.button(f"{mo}월", key=f"mo_dis_{m}", disabled=True, use_container_width=True)
+                lbl = f"{mo}월 🔒" if m in _unclosed else f"{mo}월"
+                st.button(lbl, key=f"mo_dis_{m}", disabled=True, use_container_width=True)
     for i in range(6):
         mo = i + 7
         m = f"{st.session_state.sel_yr}-{mo:02d}"
         with mo_cols_row2[i]:
-            if m in yr_months_set:
+            if m in yr_months_set and m not in _unclosed:
                 if st.button(f"{mo}월", key=f"mo_{m}",
                              type="primary" if m == st.session_state.sel_mo else "secondary",
                              use_container_width=True):
                     st.session_state.sel_mo = m; st.rerun()
             else:
-                st.button(f"{mo}월", key=f"mo_dis_{m}", disabled=True, use_container_width=True)
+                lbl = f"{mo}월 🔒" if m in _unclosed else f"{mo}월"
+                st.button(lbl, key=f"mo_dis_{m}", disabled=True, use_container_width=True)
 
     st.markdown('<div style="margin-top:.6rem"></div>', unsafe_allow_html=True)
 
@@ -1414,18 +1473,26 @@ with tab_detail:
         mo_max2 = max(y_12) if max(y_12) > 0 else 1
         cu_max2 = max(v for v in cum_12 if v > 0) if any(v > 0 for v in cum_12) else 1
         fig2.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=20, b=10, l=50, r=60), height=360,
-            bargap=0.4,
-            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.06,
-                        font=dict(size=11, family=FONT), bgcolor="rgba(0,0,0,0)"),
-            yaxis=dict(gridcolor="#f1f5f9", tickformat=",d", zeroline=False,
-                       range=[0, mo_max2 * 1.6], tickfont=dict(size=10), title=None, showline=False),
+            plot_bgcolor="#F9FAFB", paper_bgcolor="#FFFFFF",
+            margin=dict(t=44, b=8, l=4, r=60), height=360,
+            bargap=0.38,
+            legend=dict(orientation="h", x=1, xanchor="right", y=1.06,
+                        font=dict(size=10, family=FONT), bgcolor="rgba(0,0,0,0)"),
+            yaxis=dict(gridcolor="#EEEEEE", zeroline=False, showticklabels=False,
+                       range=[0, mo_max2 * 1.65], title=None, showline=False),
             yaxis2=dict(overlaying="y", side="right", range=[0, cu_max2 * 1.3],
-                        tickformat=",d", tickfont=dict(size=10),
+                        tickformat=",.0f", ticksuffix="만",
+                        tickfont=dict(size=9, color="#E65100"),
                         showgrid=False, title=None, showline=False),
-            xaxis=dict(showgrid=False, tickfont=dict(size=11), showline=False),
+            xaxis=dict(showgrid=False, tickfont=dict(size=10, family=FONT), showline=False),
             font=dict(family=FONT),
+        )
+        fig2.add_annotation(
+            x=1, y=1.03, xref="paper", yref="paper",
+            text="단위: 만원",
+            showarrow=False, xanchor="right",
+            font=dict(size=10, color="#9E9E9E", family=FONT),
+            yanchor="bottom",
         )
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
