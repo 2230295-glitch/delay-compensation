@@ -493,6 +493,9 @@ def load_monthly(file_bytes, think_codes=None):
     df = df.dropna(subset=["_잔고","_일수"]).copy(); df["_일수"] = df["_일수"].astype(int)
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
+    # DW07은 2025년 이전 데이터만 사용
+    dw07_post25 = (df["채널"] == "DW07") & (df["_yr"] >= 2025)
+    df = df[~dw07_post25]
     if think_codes and "채널" in df.columns:
         dw07_mask = df["채널"] == "DW07"
         df = df[~dw07_mask | df["판매처"].isin(think_codes)]
