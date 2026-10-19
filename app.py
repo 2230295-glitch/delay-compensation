@@ -932,7 +932,7 @@ with tab_agg:
     ins1, ins2 = st.columns(2, gap="medium")
 
     with ins1:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>누적 지체보상금 TOP 거래처</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>지체보상금 다발 거래처 TOP 5</div>', unsafe_allow_html=True)
         _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
                  .sum().reset_index()
                  .sort_values("지체보상금", ascending=False).head(5).reset_index(drop=True))
@@ -949,27 +949,57 @@ with tab_agg:
                     f'{_top_html}</div>', unsafe_allow_html=True)
 
     with ins2:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
+        _bu_yr = months_sorted[-1][:4] if months_sorted else cur_yr
+        st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
         if "사업부" in result_df.columns:
             _bu_df = (result_df[result_df["사업부"].str.strip().ne("") & result_df["사업부"].notna()]
                       .groupby("사업부")["지체보상금"].sum()
                       .reset_index().sort_values("지체보상금"))
             _bu_df = _bu_df[_bu_df["지체보상금"] > 0]
             if not _bu_df.empty:
-                _bu_colors = ["#F57C00" if v == _bu_df["지체보상금"].max() else "#FFCC80"
-                              for v in _bu_df["지체보상금"]]
+                _bu_palette = ["#F57C00","#EF5350","#42A5F5","#66BB6A","#AB47BC",
+                               "#26C6DA","#FFA726","#EC407A","#8D6E63","#78909C"]
+                _bu_colors = [_bu_palette[i % len(_bu_palette)] for i in range(len(_bu_df))]
+                _x_max = _bu_df["지체보상금"].max()
+                _tick_max = _x_max * 1.3
                 _fig_bu = go.Figure(go.Bar(
-                    y=_bu_df["사업부"], x=_bu_df["지체보상금"],
+                    y=_bu_df["사업부"],
+                    x=_bu_df["지체보상금"] / 1e8,
                     orientation="h",
                     marker_color=_bu_colors,
-                    text=[fmt_won(v, short=True) for v in _bu_df["지체보상금"]],
+                    text=[f'{v/1e8:.2f}억' if v >= 1e6 else fmt_won(v, short=True)
+                          for v in _bu_df["지체보상금"]],
                     textposition="outside",
+                    cliponaxis=False,
+                    textfont=dict(size=10, family=FONT),
                 ))
                 _fig_bu.update_layout(
-                    margin=dict(l=0, r=60, t=10, b=10), height=280,
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-                    yaxis=dict(tickfont=dict(size=11), showgrid=False),
+                    annotations=[dict(
+                        x=0, y=1.06, xref="paper", yref="paper",
+                        text=f"<b>사업부별 지체보상금</b>  <span style='color:#9E9E9E;font-size:11px'>{_bu_yr}년 누계</span>",
+                        showarrow=False, xanchor="left", font=dict(size=13, family=FONT),
+                    ), dict(
+                        x=0, y=1.01, xref="paper", yref="paper",
+                        text="단위: 억원",
+                        showarrow=False, xanchor="left",
+                        font=dict(size=10, color="#9E9E9E", family=FONT),
+                    )],
+                    margin=dict(l=0, r=70, t=55, b=10),
+                    height=max(260, len(_bu_df) * 28 + 80),
+                    paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+                    xaxis=dict(
+                        range=[0, _tick_max / 1e8],
+                        tickformat=".1f",
+                        ticksuffix="억",
+                        showgrid=True, gridcolor="#F0F0F0", zeroline=False,
+                        tickfont=dict(size=9, color="#9E9E9E"),
+                        showline=False,
+                    ),
+                    yaxis=dict(
+                        tickfont=dict(size=10, family=FONT),
+                        showgrid=False,
+                        automargin=True,
+                    ),
                     font=dict(family=FONT),
                 )
                 st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
@@ -1026,56 +1056,57 @@ with tab_agg:
         )
 
     with col_chart:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>월별 지체보상금 추이</div>', unsafe_allow_html=True)
+        _WINDOW = 18  # 최근 N개월만 표시 (데이터 늘어도 자동 슬라이딩)
+        _mo_window = months_sorted[-_WINDOW:]
+        _note = f"최근 {len(_mo_window)}개월" if len(months_sorted) > _WINDOW else f"전체 {len(_mo_window)}개월"
+        st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>월별 지체보상금 추이 <span class="sec-sub">{_note}</span></div>', unsafe_allow_html=True)
 
-        x_all = [mo_label(m) for m in months_sorted]
-        y_all = [int(mo_sum.get(m, 0)) / 10000 for m in months_sorted]
-        bar_colors_all = ["#F57C00" if int(mo_sum.get(m, 0)) > 0 else "#E0E0E0" for m in months_sorted]
-        cum_all = []
-        run = 0
-        for v in y_all:
-            run += v
-            cum_all.append(round(run, 1))
+        x_w  = [mo_label(m) for m in _mo_window]
+        y_w  = [int(mo_sum.get(m, 0)) / 1e8 for m in _mo_window]
+        bar_colors_w = ["#F57C00" if v > 0 else "#E8E8E8" for v in y_w]
+
+        # 누적은 전체 기간 기준으로 계산 후 윈도우 슬라이싱
+        _cum_full, _run = [], 0
+        for m in months_sorted:
+            _run += int(mo_sum.get(m, 0)) / 1e8
+            _cum_full.append(round(_run, 2))
+        _cum_w = _cum_full[-len(_mo_window):]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=x_all, y=cum_all, name="누적",
-            mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
-            fill="tozeroy", fillcolor="rgba(245,124,0,0.07)",
-            hoverinfo="skip", yaxis="y2", showlegend=False,
-        ))
         fig.add_trace(go.Bar(
-            x=x_all, y=y_all, name="월별",
-            marker_color=bar_colors_all, marker_line_width=0,
-            text=[f"{v:,.0f}만" if v > 0 else "" for v in y_all],
+            x=x_w, y=y_w, name="월 발생",
+            marker_color=bar_colors_w, marker_line_width=0,
+            text=[f"{v:.2f}억" if v > 0 else "" for v in y_w],
             textposition="outside", cliponaxis=False,
-            textfont=dict(size=9, color="#64748b"),
-            hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
+            textfont=dict(size=9, color="#546e7a"),
+            hovertemplate="<b>%{x}</b><br>%{y:.2f}억원<extra></extra>",
             yaxis="y1",
         ))
         fig.add_trace(go.Scatter(
-            x=x_all, y=[v if v > 0 else None for v in cum_all], name="누적",
+            x=x_w, y=[v if v > 0 else None for v in _cum_w], name="누적",
             mode="lines+markers",
-            line=dict(color="#F57C00", width=2.5),
-            marker=dict(size=6, color="#F57C00", line=dict(color="#fff", width=2)),
-            hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
+            line=dict(color="#F57C00", width=2.5, dash="solid"),
+            marker=dict(size=5, color="#F57C00", line=dict(color="#fff", width=1.5)),
+            hovertemplate="<b>%{x}</b><br>누적 %{y:.2f}억원<extra></extra>",
             yaxis="y2",
         ))
-        mo_max = max(y_all) if max(y_all) > 0 else 1
-        cu_max = max(cum_all) if max(cum_all) > 0 else 1
+        _mo_max = max(y_w) if any(v > 0 for v in y_w) else 1
+        _cu_max = max(v for v in _cum_w if v) if any(v for v in _cum_w) else 1
         fig.update_layout(
             plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(t=10, b=10, l=50, r=60),
+            margin=dict(t=10, b=10, l=10, r=55),
             height=460,
-            bargap=0.35,
+            bargap=0.38,
             legend=dict(orientation="h", x=0.5, xanchor="center", y=1.04,
                         font=dict(size=11, family=FONT), bgcolor="rgba(0,0,0,0)"),
-            yaxis=dict(gridcolor="#f1f5f9", tickformat=",d", zeroline=False,
-                       range=[0, mo_max * 1.6], tickfont=dict(size=10), title=None, showline=False),
-            yaxis2=dict(overlaying="y", side="right", range=[0, cu_max * 1.25],
-                        tickformat=",d", tickfont=dict(size=10),
+            yaxis=dict(gridcolor="#F5F5F5", zeroline=False, showticklabels=False,
+                       range=[0, _mo_max * 1.7], showline=False),
+            yaxis2=dict(overlaying="y", side="right", range=[0, _cu_max * 1.2],
+                        tickformat=".1f", ticksuffix="억",
+                        tickfont=dict(size=9, color="#F57C00"),
                         showgrid=False, title=None, showline=False),
-            xaxis=dict(showgrid=False, tickfont=dict(size=10), showline=False, tickangle=-40),
+            xaxis=dict(showgrid=False, tickfont=dict(size=10), showline=False,
+                       tickangle=-40 if len(_mo_window) > 12 else 0),
             font=dict(family=FONT),
         )
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
@@ -1297,7 +1328,7 @@ with tab_detail:
     left_col, right_col = st.columns([5, 5], gap="large")
 
     with left_col:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>청구 거래처 랭킹</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>이달 청구 거래처 현황</div>', unsafe_allow_html=True)
         charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
         all_max = int(charge["지체보상금"].max()) if not charge.empty else 1
         rank_colors = ["#ef4444","#f97316","#f59e0b","#84cc16","#22c55e",
