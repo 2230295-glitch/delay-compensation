@@ -850,38 +850,11 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
     sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
     sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
 
-    # 계약 매핑: CSV 우선 사용 → Excel 이름매칭 보완
+    # 계약 매핑: Excel 단독 (openpyxl 직접 읽기, recalculate_with_contract.py 동일 로직)
     cmap = {}
     n_yes = n_no = 0
-    if csv_b:
-        import csv as _csv
-        _reader = _csv.DictReader(io.StringIO(csv_b.decode("utf-8-sig")))
-        for row in _reader:
-            code = str(row.get("판매처코드","")).strip()
-            if not code: continue
-            is_yes = str(row.get("지체여부","")).strip().lower() == "true"
-            try: rate = float(row.get("요율") or 0.001)
-            except: rate = 0.001
-            cmap[code] = {"지체여부": is_yes, "요율": rate,
-                          "계약유형": "", "사업자번호": ""}
-            if is_yes: n_yes += 1
-            else: n_no += 1
     if c_b:
-        _cmap_xl, _ny, _nn = load_contract(c_b, sap_raw)
-        for code, info in _cmap_xl.items():
-            if code not in cmap:
-                cmap[code] = info
-                if info["지체여부"]: n_yes += 1
-                else: n_no += 1
-            else:
-                # CSV에 있는 코드 → 계약유형/사업자번호만 Excel에서 보완
-                cmap[code]["계약유형"]  = info.get("계약유형", "")
-                cmap[code]["사업자번호"] = info.get("사업자번호", "")
-        # Excel에서 확인 안 된 CSV 코드는 변경된 코드로 간주 → 제외
-        if _cmap_xl:
-            for code in list(cmap.keys()):
-                if code not in _cmap_xl:
-                    cmap[code]["지체여부"] = False
+        cmap, n_yes, n_no = load_contract(c_b, sap_raw)
 
     # 기준회전일 (씽크 파일의 회전일 오버라이드 반영)
     think_rot = load_think(t_b) if t_b else None
