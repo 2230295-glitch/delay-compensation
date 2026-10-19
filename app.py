@@ -165,28 +165,26 @@ button[kind="secondary"]:hover {
   border: 1px solid #E0E0E0;
   overflow: hidden;
 }
-.chg-head-area {
+/* 카드 헤더: .chg-title 이 직접 배경색 적용 */
+.chg-card .chg-title {
+  font-size: .83rem; font-weight: 700;
   padding: .6rem .9rem;
-  border-bottom: 1px solid #E0E0E0;
+  border-bottom: 1px solid #E8E8E8;
+  display: block;
 }
-.chg-head-area.red   { background: #FFF5F5; }
-.chg-head-area.amber { background: #FFFBEB; }
-.chg-head-area.green { background: #F0FDF4; }
-.chg-body { padding: .7rem .9rem; }
-.chg-title { font-size: .84rem; font-weight: 700; }
-.chg-title.red   { color: #C53030; }
-.chg-title.amber { color: #C05621; }
-.chg-title.green { color: #276749; }
-.chg-cnt  { font-size: .71rem; color: #9E9E9E; margin-left: .3rem; }
+.chg-card.red   .chg-title { background: #FFF5F5; color: #C53030; }
+.chg-card.amber .chg-title { background: #FFFBEB; color: #B45309; }
+.chg-card.green .chg-title { background: #F0FDF4; color: #276749; }
+/* 카드 바디: 아이템 행 */
 .chg-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: .35rem 0; border-bottom: 1px solid #F5F5F5;
-  font-size: .81rem;
+  display: flex; align-items: center; gap: .4rem;
+  padding: .42rem .9rem; border-bottom: 1px solid #F5F5F5;
+  font-size: .82rem;
 }
-.chg-name { color: #424242; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62%; }
-.chg-org  { font-size: .68rem; color: #BDBDBD; margin-left: .25rem; }
-.chg-amt  { font-weight: 700; white-space: nowrap; }
-.chg-none { color: #BDBDBD; font-size: .81rem; padding: 1rem 0; text-align: center; }
+.chg-row:last-child { border-bottom: none; }
+.chg-num  { font-size: .68rem; color: #BDBDBD; width: 1rem; flex-shrink: 0; text-align: center; }
+.chg-name { color: #424242; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chg-amt  { font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 
 /* ── 랭킹 ── */
 .rank-item {
@@ -964,8 +962,8 @@ with tab_agg:
         fig.add_trace(go.Scatter(
             x=x_all, y=[v if v > 0 else None for v in cum_all], name="누적",
             mode="lines+markers",
-            line=dict(color="#f59e0b", width=2.5),
-            marker=dict(size=6, color="#f59e0b", line=dict(color="#fff", width=2)),
+            line=dict(color="#F57C00", width=2.5),
+            marker=dict(size=6, color="#F57C00", line=dict(color="#fff", width=2)),
             hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
             yaxis="y2",
         ))
@@ -1169,16 +1167,19 @@ with tab_detail:
         rows = ""
         for i, x in enumerate(lst[:5]):
             rows += (f'<div class="chg-row">'
-                     f'<span style="font-size:.7rem;color:#cbd5e1;width:1rem;flex-shrink:0">{i+1}</span>'
+                     f'<span class="chg-num">{i+1}</span>'
                      f'<span class="chg-name">{x["명칭"]}</span>'
                      f'<span class="chg-amt" style="color:{amt_color}">{fmt_won(x["금액"], short=True)}</span>'
                      f'</div>')
+        if len(lst) > 5:
+            etc_amt = sum(x["금액"] for x in lst[5:])
+            rows += f'<div style="font-size:.71rem;color:#9E9E9E;padding:.35rem .9rem">그 외 {len(lst)-5}처 ({fmt_won(etc_amt,short=True)})</div>'
         if not lst:
-            rows = '<div style="color:#94a3b8;font-size:.82rem;padding:1.4rem 0;text-align:center">해당 없음</div>'
+            rows = '<div style="color:#BDBDBD;font-size:.81rem;padding:1.2rem .9rem;text-align:center">해당 없음</div>'
         total = sum(x["금액"] for x in lst)
-        badge = f'<span style="font-size:.73rem;color:#64748b;font-weight:400"> {len(lst)}건 · 합계 {fmt_won(total,short=True)}</span>'
+        badge = f'<span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">{len(lst)}건 &nbsp;·&nbsp; 합계 {fmt_won(total,short=True)}</span>'
         return (f'<div class="chg-card {cls}">'
-                f'<div class="chg-title" style="color:{amt_color}">{title}{badge}</div>'
+                f'<div class="chg-title">{title}{badge}</div>'
                 f'{rows}</div>')
 
     cc1, cc2, cc3 = st.columns(3, gap="medium")
@@ -1253,8 +1254,8 @@ with tab_detail:
         fig2.add_trace(go.Scatter(
             x=x_12, y=cum_line_12, name="누적",
             mode="lines+markers",
-            line=dict(color="#f59e0b", width=2.5),
-            marker=dict(size=6, color="#f59e0b", line=dict(color="#fff", width=2)),
+            line=dict(color="#F57C00", width=2.5),
+            marker=dict(size=6, color="#F57C00", line=dict(color="#fff", width=2)),
             hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
             yaxis="y2",
         ))
