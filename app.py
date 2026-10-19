@@ -928,6 +928,56 @@ with tab_agg:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── 인사이트: 누적 TOP + 사업부별 ──────────────────────────
+    ins1, ins2 = st.columns(2, gap="medium")
+
+    with ins1:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>누적 지체보상금 TOP 거래처</div>', unsafe_allow_html=True)
+        _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
+                 .sum().reset_index()
+                 .sort_values("지체보상금", ascending=False).head(5).reset_index(drop=True))
+        _top_html = ""
+        for _i, _row in _top5.iterrows():
+            _v = int(_row["지체보상금"])
+            _top_html += (f'<div class="chg-row">'
+                          f'<span class="chg-num">{_i+1}</span>'
+                          f'<span class="chg-name">{_row["판매처명"]}</span>'
+                          f'<span class="chg-amt" style="color:#F57C00">{fmt_won(_v, short=True)}</span>'
+                          f'</div>')
+        st.markdown(f'<div class="chg-card orange">'
+                    f'<div class="chg-title">전 기간 누적 합계 기준 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">TOP 5</span></div>'
+                    f'{_top_html}</div>', unsafe_allow_html=True)
+
+    with ins2:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
+        if "사업부" in result_df.columns:
+            _bu_df = (result_df[result_df["사업부"].str.strip().ne("") & result_df["사업부"].notna()]
+                      .groupby("사업부")["지체보상금"].sum()
+                      .reset_index().sort_values("지체보상금"))
+            _bu_df = _bu_df[_bu_df["지체보상금"] > 0]
+            if not _bu_df.empty:
+                _bu_colors = ["#F57C00" if v == _bu_df["지체보상금"].max() else "#FFCC80"
+                              for v in _bu_df["지체보상금"]]
+                _fig_bu = go.Figure(go.Bar(
+                    y=_bu_df["사업부"], x=_bu_df["지체보상금"],
+                    orientation="h",
+                    marker_color=_bu_colors,
+                    text=[fmt_won(v, short=True) for v in _bu_df["지체보상금"]],
+                    textposition="outside",
+                ))
+                _fig_bu.update_layout(
+                    margin=dict(l=0, r=60, t=10, b=10), height=280,
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+                    yaxis=dict(tickfont=dict(size=11), showgrid=False),
+                    font=dict(family=FONT),
+                )
+                st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.caption("사업부 정보 없음")
+        else:
+            st.caption("사업부 정보 없음")
+
     col_tbl, col_chart = st.columns([1, 1], gap="large")
 
     with col_tbl:
@@ -1077,56 +1127,6 @@ with tab_agg:
             )
     else:
         st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
-
-    # ── 인사이트: 누적 TOP + 사업부별 ──────────────────────────
-    ins1, ins2 = st.columns(2, gap="medium")
-
-    with ins1:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>누적 지체보상금 TOP 거래처</div>', unsafe_allow_html=True)
-        _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
-                 .sum().reset_index()
-                 .sort_values("지체보상금", ascending=False).head(5).reset_index(drop=True))
-        _top_html = ""
-        for _i, _row in _top5.iterrows():
-            _v = int(_row["지체보상금"])
-            _top_html += (f'<div class="chg-row">'
-                          f'<span class="chg-num">{_i+1}</span>'
-                          f'<span class="chg-name">{_row["판매처명"]}</span>'
-                          f'<span class="chg-amt" style="color:#F57C00">{fmt_won(_v, short=True)}</span>'
-                          f'</div>')
-        st.markdown(f'<div class="chg-card orange">'
-                    f'<div class="chg-title">전 기간 누적 합계 기준 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">TOP 5</span></div>'
-                    f'{_top_html}</div>', unsafe_allow_html=True)
-
-    with ins2:
-        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>사업부별 지체보상금 현황</div>', unsafe_allow_html=True)
-        if "사업부" in result_df.columns:
-            _bu_df = (result_df[result_df["사업부"].str.strip().ne("") & result_df["사업부"].notna()]
-                      .groupby("사업부")["지체보상금"].sum()
-                      .reset_index().sort_values("지체보상금"))
-            _bu_df = _bu_df[_bu_df["지체보상금"] > 0]
-            if not _bu_df.empty:
-                _bu_colors = ["#F57C00" if v == _bu_df["지체보상금"].max() else "#FFCC80"
-                              for v in _bu_df["지체보상금"]]
-                _fig_bu = go.Figure(go.Bar(
-                    y=_bu_df["사업부"], x=_bu_df["지체보상금"],
-                    orientation="h",
-                    marker_color=_bu_colors,
-                    text=[fmt_won(v, short=True) for v in _bu_df["지체보상금"]],
-                    textposition="outside",
-                ))
-                _fig_bu.update_layout(
-                    margin=dict(l=0, r=60, t=10, b=10), height=280,
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-                    yaxis=dict(tickfont=dict(size=11), showgrid=False),
-                    font=dict(family=FONT),
-                )
-                st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
-            else:
-                st.caption("사업부 정보 없음")
-        else:
-            st.caption("사업부 정보 없음")
 
 
 # ══════════════════════════════════════════════════════════════
