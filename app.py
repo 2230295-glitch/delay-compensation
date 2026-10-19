@@ -830,7 +830,7 @@ CT_LIST    = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("in
 CT_PATH    = CT_LIST[0] if CT_LIST else None
 
 @st.cache_data(show_spinner=False)
-def _read_mo_folder(folder_str: str):
+def _read_mo_folder(folder_str: str, _mtime: float = 0):
     folder = Path(folder_str)
     files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
     if not files:
@@ -873,7 +873,7 @@ with st.expander("📁 파일 관리", expanded=False):
 # 데이터
 # ──────────────────────────────────────────────────────────────
 if use_default:
-    _mo_result = _read_mo_folder(str(MO_FOLDER)) if MO_FOLDER.exists() else None
+    _mo_result = _read_mo_folder(str(MO_FOLDER), _mtime=max((f.stat().st_mtime for f in (sorted(MO_FOLDER.glob("*.xlsx"))+sorted(MO_FOLDER.glob("*.xls"))) if f.exists()), default=0) if MO_FOLDER.exists() else 0) if MO_FOLDER.exists() else None
     m_b, _mo_names = _mo_result if _mo_result else (None, [])
     b_b = _read_bytes(str(BASE_PATH))
     c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
