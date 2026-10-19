@@ -315,71 +315,56 @@ def _norm(s):
 
 # ──────────────────────────────────────────────────────────────
 def load_contract(file_bytes, sap_df):
-    try:    df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='계약서', dtype=str, header=5)
-    except: df = pd.read_excel(io.BytesIO(file_bytes), dtype=str, header=5)
-    df.columns = [str(c).strip() for c in df.columns]
-
-    # 실제 Excel 컬럼명으로 찾기 (유연하게)
-    def _fcol(*names):
-        for n in names:
-            for c in df.columns:
-                if n in str(c): return c
-        return None
-    col_no    = _fcol('No', 'NO', 'no', 'N0')
-    col_name  = _fcol('병원명', '병원', '거래처명', '고객명', '업체명')
-    col_code  = _fcol('거래처코드', '판매처코드', '고객코드', '거래처 코드', '판매처 코드')
-    col_type  = _fcol('계약유형', '유형', '계약 유형')
-    col_biz   = _fcol('사업자번호', '사업자 번호', '사업자No', '사업자 No', '사업자등록번호', '사업자등록')
-    col_jiche = _fcol('지체보상금')
-    # fallback: 컬럼 못찾을 경우 위치 기반 (원본 cols 순서 참고)
-    _cols_fb  = list(df.columns)
-    if col_code is None and len(_cols_fb) > 2:  col_code = _cols_fb[2]   # C열
-    if col_type is None and len(_cols_fb) > 3:  col_type = _cols_fb[3]   # D열
-    if col_biz  is None and len(_cols_fb) > 4:  col_biz  = _cols_fb[4]   # E열
-    if col_jiche is None and len(_cols_fb) > 10: col_jiche = _cols_fb[10] # K열
-
-    # 숫자 No. 행만 유지
-    if col_no:
-        df = df[df[col_no].notna() & df[col_no].astype(str).str.match(r'^\d+$', na=False)].copy()
-
-    df['지체여부'] = df[col_jiche].apply(lambda x: '지체보상금' in str(x)) if col_jiche else False
-    def _rate(x):
-        m = re.search(r'\[(\d+)/(\d+)\]', str(x))
-        return float(m.group(1)) / float(m.group(2)) if m else 1/1000
-    df['요율'] = df[col_jiche].apply(_rate) if col_jiche else 1/1000
-
-    # SAP 기준파일 이름→코드 매핑 (fallback)
+    import openpyxl as _xl
+    # SAP 기준파일 이름→코드 매핑 (이름 매칭 fallback용)
     s2 = sap_df.copy(); s2['_norm'] = s2['판매처명'].apply(_norm)
     sm = dict(zip(s2['_norm'], s2['판매처']))
+    sn_list = list(s2['_norm']); sc_list = list(s2['판매처'])
 
-    # 1차: 거래처코드 컬럼 직접 매핑
-    df['코드'] = None
-    if col_code:
-        _mask = df[col_code].notna() & (df[col_code].astype(str).str.strip() != '') & (df[col_code] != 'nan')
-        df.loc[_mask, '코드'] = df.loc[_mask, col_code].astype(str).str.strip()
+    try:
+        wb = _xl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+        ws = wb['계약서'] if '계약서' in wb.sheetnames else wb.active
+    except Exception:
+        return {}, 0, 0
 
-    # 2차: 이름 기반 매핑 (코드 없는 행)
-    if col_name:
-        df['_norm'] = df[col_name].apply(_norm)
-        _no_code = df['코드'].isna()
-        df.loc[_no_code, '코드'] = df.loc[_no_code, '_norm'].map(sm)
-        for idx, row in df[df['코드'].isna()].iterrows():
-            cn = row['_norm']
-            if len(cn) < 4: continue
-            for sn, sc in zip(s2['_norm'], s2['판매처']):
-                if len(sn) >= 4 and (cn in sn or sn in cn):
-                    df.at[idx, '코드'] = sc; break
-
+    # 헤더 행 스캔: '거래처코드' 또는 '병원명' 키워드가 있는 행을 헤더로 사용
+    # 없으면 recalculate_with_contract.py 기준 고정 위치 (min_row=12) 사용
+    FIXED = {"code": 2, "name": 1, "type": 3, "biz": 4, "jiche": 24}  # 0-indexed 열 위치
     result = {}
-    for _, r in df[df['코드'].notna()].iterrows():
-        c = str(r['코드']).strip()
-        if not c or c == 'nan': continue
-        if c not in result or not result[c]["지체여부"]:
-            result[c] = {
-                "지체여부": bool(r['지체여부']), "요율": float(r['요율']),
-                "계약유형":  str(r[col_type]).strip()  if col_type  and r[col_type]  not in (None,'nan') else "",
-                "사업자번호": str(r[col_biz]).strip()   if col_biz   and r[col_biz]   not in (None,'nan') else "",
+    for row in ws.iter_rows(min_row=12, max_row=ws.max_row, values_only=True):
+        if not row or len(row) < 3: continue
+        no_val = row[0]
+        if not str(no_val or '').strip().isdigit(): continue
+
+        code  = str(row[FIXED["code"]] or '').strip()
+        name  = str(row[FIXED["name"]] or '').strip()
+        ctype = str(row[FIXED["type"]] or '').strip()
+        biz   = str(row[FIXED["biz"]]  or '').strip()
+        y_val = str(row[FIXED["jiche"]] or '').strip() if len(row) > FIXED["jiche"] else ''
+
+        is_yes = bool(y_val)
+        rate_m = re.search(r'\[(\d+)/(\d+)\]', y_val)
+        rate   = float(rate_m.group(1)) / float(rate_m.group(2)) if rate_m else 1/1000
+
+        # 코드가 없거나 비어있으면 이름 매칭으로 보완
+        if not code or code == 'nan':
+            norm_n = _norm(name)
+            code = sm.get(norm_n, '')
+            if not code:
+                for sn, sc in zip(sn_list, sc_list):
+                    if len(sn) >= 4 and len(norm_n) >= 4 and (norm_n in sn or sn in norm_n):
+                        code = sc; break
+
+        if not code or code == 'nan': continue
+        if code not in result or not result[code]["지체여부"]:
+            result[code] = {
+                "지체여부": is_yes, "요율": rate,
+                "계약유형":  ctype if ctype not in ('nan','') else '',
+                "사업자번호": biz   if biz   not in ('nan','') else '',
             }
+
+    try: wb.close()
+    except: pass
     n_yes = sum(1 for v in result.values() if v["지체여부"])
     n_no  = sum(1 for v in result.values() if not v["지체여부"])
     return result, n_yes, n_no
@@ -892,6 +877,11 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
                 # CSV에 있는 코드 → 계약유형/사업자번호만 Excel에서 보완
                 cmap[code]["계약유형"]  = info.get("계약유형", "")
                 cmap[code]["사업자번호"] = info.get("사업자번호", "")
+        # Excel에서 확인 안 된 CSV 코드는 변경된 코드로 간주 → 제외
+        if _cmap_xl:
+            for code in list(cmap.keys()):
+                if code not in _cmap_xl:
+                    cmap[code]["지체여부"] = False
 
     # 기준회전일 (씽크 파일의 회전일 오버라이드 반영)
     think_rot = load_think(t_b) if t_b else None
