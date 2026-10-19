@@ -991,7 +991,8 @@ with tab_agg:
                     ),
                     font=dict(family=FONT),
                 )
-                st.markdown('<div style="font-size:.7rem;color:#BDBDBD;margin-bottom:.2rem">단위: 억원 &nbsp;·&nbsp; 전체 기간 누계</div>', unsafe_allow_html=True)
+                st.markdown('<p style="font-size:.7rem;color:#BDBDBD;margin:0 0 .2rem">단위: 억원 &nbsp;·&nbsp; 전체 기간 누계</p>', unsafe_allow_html=True)
+                _fig_bu.update_layout(paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF")
                 st.plotly_chart(_fig_bu, use_container_width=True, config={"displayModeBar": False})
             else:
                 st.caption("사업부 정보 없음")
