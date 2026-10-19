@@ -1,5 +1,5 @@
-﻿"""
-지체보상금 대시보드 v6
+"""
+지체보상금 대시보드 v7
 실행: streamlit run app.py
 """
 import io, re, calendar, zipfile
@@ -23,9 +23,9 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter as gcl
 
-st.set_page_config(page_title="지체보상금 대시보드", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
+st.set_page_config(page_title="지체보상금 대시보드", layout="wide", page_icon="📊",
+                   initial_sidebar_state="collapsed")
 
-# 나눔스퀘어네오 — Google Fonts 미지원, jsDelivr CDN 사용
 st.markdown(
     '<link href="https://cdn.jsdelivr.net/gh/webfontworld/naverfonts/NanumSquareNeo.css" rel="stylesheet">',
     unsafe_allow_html=True,
@@ -37,190 +37,160 @@ html, body, [class*="css"], .stApp, button, input, select, textarea,
   font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
 }
 
-/* ── 배경 + 상단 패딩 제거 ── */
-.stApp { background: #f2f4f8; }
-header[data-testid="stHeader"] {
-  background: transparent !important;
-  height: 2.5rem !important;
-  min-height: 0 !important;
-}
-[data-testid="stToolbar"] { visibility: hidden !important; }
+/* ── 레이아웃 ── */
+.stApp { background: #f0f2f7; }
+header[data-testid="stHeader"] { background: transparent !important; height: 0 !important; min-height: 0 !important; }
+[data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
 [data-testid="stStatusWidget"] { display: none !important; }
 #MainMenu { display: none !important; }
-.stMainBlockContainer, .block-container, .appview-container .main .block-container {
+section[data-testid="stSidebar"] { display: none !important; }
+.stMainBlockContainer, .block-container {
   max-width: 100% !important;
-  padding: 0 2rem 3rem !important;
+  padding: 0 1.8rem 3rem !important;
   padding-top: 0 !important;
 }
 
-/* ── 사이드바 ── */
-section[data-testid="stSidebar"] > div:first-child { background: #1b2838 !important; }
-section[data-testid="stSidebar"] * {
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
-}
-section[data-testid="stSidebar"] label { color: #8ab3cf !important; font-size: .82rem !important; }
-section[data-testid="stSidebar"] p     { color: #6a93b0 !important; font-size: .78rem !important; }
-section[data-testid="stSidebar"] hr    { border-color: #243444 !important; }
-section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
-  background: #162432 !important; border: 1.5px dashed #2e4f6a !important; border-radius: 8px !important;
-}
-
 /* ── 헤더 ── */
-.ph {
-  background: #1b2838;
-  padding: 1rem 2rem; margin: 0 -2rem 1.6rem;
+.top-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+  padding: 1.1rem 1.8rem; margin: 0 -1.8rem 1.4rem;
   display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 3px solid #e67e22;
+  border-bottom: 3px solid #3b82f6;
 }
-.ph-l { display: flex; flex-direction: column; gap: .15rem; }
-.ph-title { font-size: 1.3rem; font-weight: 800; color: #fff; }
-.ph-sub   { font-size: .72rem; color: #6a9dbf; }
-.ph-badge {
-  background: #243444; color: #7ab8d8; font-size: .72rem; font-weight: 700;
-  padding: .3rem .85rem; border-radius: 4px; border: 1px solid #2e4a62;
+.hd-title { font-size: 1.25rem; font-weight: 900; color: #fff; letter-spacing: -.01em; }
+.hd-sub   { font-size: .72rem; color: #64a0c8; margin-top: .12rem; }
+.hd-badge {
+  background: rgba(59,130,246,.15); color: #93c5fd;
+  border: 1px solid rgba(59,130,246,.3);
+  font-size: .74rem; font-weight: 700; padding: .28rem .8rem; border-radius: 4px;
 }
-
-/* ── KPI 카드 4개 ── */
-.kpi-wrap {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 1rem; margin-bottom: 1.4rem;
-}
-.kpi-card {
-  background: #fff; border-radius: 10px;
-  padding: 1.15rem 1.4rem 1rem;
-  box-shadow: 0 1px 6px rgba(0,0,0,.07);
-  border-top: 4px solid #ccc;
-  position: relative;
-}
-.kpi-card.c-orange { border-top-color: #e67e22; }
-.kpi-card.c-red    { border-top-color: #c0392b; }
-.kpi-card.c-blue   { border-top-color: #2471a3; }
-.kpi-card.c-gray   { border-top-color: #5d6d7e; }
-
-.kpi-lbl  { font-size: .72rem; color: #999; font-weight: 700; letter-spacing: .04em; margin-bottom: .4rem; }
-.kpi-num  { font-size: 1.95rem; font-weight: 800; line-height: 1.1; color: #1a2535; }
-.kpi-unit { font-size: 1rem; font-weight: 700; color: #555; margin-left: .1rem; }
-.kpi-delta { font-size: .76rem; margin-top: .35rem; color: #aaa; }
-.kpi-up   { color: #c0392b; font-weight: 700; }
-.kpi-dn   { color: #2471a3; font-weight: 700; }
-
-/* ── 섹션 제목 ── */
-.sec-hd {
-  font-size: .9rem; font-weight: 800; color: #1a2535;
-  display: flex; align-items: center; gap: .45rem;
-  padding-bottom: .5rem; margin-bottom: .85rem;
-  border-bottom: 1.5px solid #e5e9f0;
-}
-.sec-bar { width: 4px; height: 16px; border-radius: 2px; background: #2471a3; flex-shrink: 0; }
-
-/* ── 다운로드 버튼 ── */
-.stDownloadButton > button {
-  background: #1b2838 !important; color: #fff !important;
-  border: none !important; border-radius: 6px !important;
-  font-weight: 800 !important; font-size: .84rem !important;
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
-  padding: .55rem 1.1rem !important;
-  white-space: nowrap !important;
-}
-.stDownloadButton > button:hover { background: #243444 !important; }
-
-/* ── 줄바꿈 방지 ── */
-.kpi-lbl, .kpi-num, .kpi-unit, .kpi-delta { white-space: nowrap; }
-[data-testid="stDataFrame"] th { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
-[data-testid="stDataFrame"] td { white-space: nowrap !important; }
-.stButton > button { white-space: nowrap !important; }
 
 /* ── 탭 ── */
-.stTabs {
-  background: #ffffff;
-  border-radius: 10px;
-  border: 1px solid #e0e5ef;
-  box-shadow: 0 1px 6px rgba(0,0,0,.06);
-  padding: .8rem 1.2rem 1rem;
+[data-baseweb="tab-list"] {
+  background: #fff !important;
+  border-radius: 8px 8px 0 0 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-bottom: none !important;
+  padding: 0 .5rem !important;
+  gap: 0 !important;
 }
-.stTabs [data-baseweb="tab-list"] { gap: .25rem; border-bottom: 2px solid #dde3ef; background: transparent; }
-.stTabs [data-baseweb="tab"] {
-  font-weight: 700; font-size: .84rem; padding: .38rem 1rem; color: #aaa;
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
+[data-baseweb="tab"] {
+  font-weight: 700 !important; font-size: .88rem !important;
+  padding: .7rem 1.4rem !important; color: #94a3b8 !important;
+  border-bottom: 3px solid transparent !important;
   background: transparent !important;
+  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
 }
-.stTabs [data-baseweb="tab-panel"] { background: transparent !important; padding: .6rem 0 0; }
-.stTabs [aria-selected="true"] { color: #1b2838 !important; border-bottom: 2px solid #1b2838 !important; }
+[data-baseweb="tab"][aria-selected="true"] {
+  color: #1e40af !important;
+  border-bottom: 3px solid #3b82f6 !important;
+}
+[data-baseweb="tab-panel"] {
+  background: #fff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-top: none !important;
+  border-radius: 0 0 8px 8px !important;
+  padding: 1.2rem 1.4rem !important;
+}
+
+/* ── KPI 카드 ── */
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .85rem; margin-bottom: 1.2rem; }
+.kpi-card {
+  background: #fff; border-radius: 10px;
+  padding: 1.05rem 1.3rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  border-left: 4px solid #ccc;
+}
+.kpi-card.blue  { border-left-color: #3b82f6; }
+.kpi-card.red   { border-left-color: #ef4444; }
+.kpi-card.green { border-left-color: #10b981; }
+.kpi-card.amber { border-left-color: #f59e0b; }
+.kpi-card.indigo { border-left-color: #6366f1; }
+
+.kpi-lbl  { font-size: .7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .35rem; }
+.kpi-val  { font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
+.kpi-unit { font-size: .9rem; font-weight: 700; color: #475569; margin-left: .08rem; }
+.kpi-sub  { font-size: .71rem; color: #94a3b8; margin-top: .3rem; }
+.kpi-up   { color: #ef4444; font-weight: 700; }
+.kpi-dn   { color: #3b82f6; font-weight: 700; }
+
+/* ── 섹션 헤더 ── */
+.sec-hd {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .88rem; font-weight: 800; color: #0f172a;
+  padding-bottom: .6rem; margin: 1rem 0 .75rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+.sec-bar { width: 4px; height: 16px; border-radius: 2px; background: #3b82f6; flex-shrink: 0; }
 
 /* ── 버튼 ── */
 .stButton > button {
   font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
   font-weight: 700 !important; border-radius: 6px !important;
+  font-size: .83rem !important;
 }
+.stDownloadButton > button {
+  background: #0f172a !important; color: #fff !important;
+  border: none !important; border-radius: 6px !important;
+  font-weight: 700 !important; font-size: .83rem !important;
+  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
+  padding: .5rem 1rem !important;
+}
+.stDownloadButton > button:hover { background: #1e293b !important; }
 
-/* ── border 컨테이너 ── */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  background: #ffffff !important;
-  border-radius: 10px !important;
-  border: 1px solid #e0e5ef !important;
-  box-shadow: 0 1px 6px rgba(0,0,0,.06) !important;
+/* ── 월 선택기 ── */
+.yr-mo-area {
+  background: #f8faff; border-radius: 8px;
+  border: 1px solid #e2e8f0; padding: .85rem 1rem; margin-bottom: 1rem;
+  display: flex; align-items: flex-start; gap: 1.2rem;
 }
-[data-testid="stVerticalBlockBorderWrapper"] > div,
-[data-testid="stVerticalBlockBorderWrapper"] > div > div[data-testid="stVerticalBlock"] {
-  background: #ffffff !important;
-  border: none !important;
-  box-shadow: none !important;
-}
+.yr-label { font-size: .68rem; font-weight: 800; color: #94a3b8; letter-spacing: .08em;
+            text-transform: uppercase; margin-bottom: .4rem; }
 
-/* ── KPI 툴팁 ── */
-.kpi-tip {
+/* ── 변동 카드 (신규/추가/수금) ── */
+.chg-card {
+  background: #fff; border-radius: 10px;
+  border-top: 3px solid #ccc;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  padding: .95rem 1.1rem;
+}
+.chg-card.red   { border-top-color: #ef4444; }
+.chg-card.amber { border-top-color: #f59e0b; }
+.chg-card.green { border-top-color: #10b981; }
+.chg-title { font-size: .85rem; font-weight: 800; margin-bottom: .5rem; }
+.chg-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .38rem 0; border-bottom: 1px solid #f1f5f9;
+  font-size: .82rem;
+}
+.chg-name { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.chg-amt  { font-weight: 700; white-space: nowrap; }
+
+/* ── 랭킹 ── */
+.rank-item {
+  display: grid; grid-template-columns: 2rem 1fr 5.5rem;
+  align-items: center; gap: .7rem;
+  padding: .52rem 0; border-bottom: 1px solid #f1f5f9;
+}
+.rank-badge {
+  width: 1.4rem; height: 1.4rem; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; border-radius: 50%;
-  background: #e8edf5; color: #7a8fa6; font-size: .65rem; font-weight: 800;
-  cursor: pointer; margin-left: .3rem; vertical-align: middle;
-  position: relative; flex-shrink: 0;
+  font-size: .72rem; font-weight: 800; color: #fff; flex-shrink: 0;
 }
-.kpi-tip::after {
-  content: attr(data-tip);
-  display: none;
-  position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
-  background: #1a2535; color: #e8f0f8;
-  padding: .45rem .75rem; border-radius: 6px;
-  font-size: .72rem; white-space: nowrap; font-weight: 400;
-  z-index: 9999; pointer-events: none;
-  box-shadow: 0 3px 10px rgba(0,0,0,.25);
-  min-width: 180px; text-align: center;
-}
-.kpi-tip::before {
-  content: '';
-  display: none;
-  position: absolute; bottom: 108%; left: 50%; transform: translateX(-50%);
-  border: 5px solid transparent; border-top-color: #1a2535;
-  z-index: 9999;
-}
-.kpi-tip:hover::after, .kpi-tip:hover::before { display: block; }
-.kpi-card { overflow: visible !important; }
+.rank-bar-bg { background: #f1f5f9; border-radius: 3px; height: 6px; margin-top: .28rem; overflow: hidden; }
+.rank-bar-fg { height: 100%; border-radius: 3px; }
 
-/* ── 가이드 모달 ── */
-.guide-step-wrap { display:flex; flex-direction:column; gap:1.1rem; padding:.2rem 0; }
-.guide-step { display:flex; gap:.9rem; align-items:flex-start; }
-.guide-step-num {
-  width:32px; height:32px; border-radius:50%; flex-shrink:0;
-  display:flex; align-items:center; justify-content:center;
-  font-weight:800; font-size:.9rem; color:#fff; margin-top:.1rem;
-}
-.guide-step-body h4 { margin:0 0 .25rem; font-size:.9rem; font-weight:800; color:#1a2535; }
-.guide-step-body p  { margin:0 0 .4rem; font-size:.81rem; color:#555; line-height:1.5; }
-.guide-tip-row {
-  border-left:3px solid; padding:.32rem .65rem; margin:.2rem 0;
-  font-size:.78rem; color:#444; border-radius:0 4px 4px 0; line-height:1.5;
-}
+/* ── 집계 테이블 스타일 ── */
+[data-testid="stDataFrame"] { border-radius: 8px; overflow: hidden; }
 
-/* ── 연도/월 선택기 ── */
-.yr-mo-wrap { display:flex; align-items:flex-start; gap:1.2rem; margin-bottom:1.2rem; }
-.yr-btns { display:flex; flex-direction:column; gap:.4rem; }
-.mo-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:.35rem; flex:1; }
-.mo-btn-outer button, .yr-btn-outer button {
-  border-radius:6px !important; font-weight:700 !important;
-  font-size:.82rem !important; padding:.35rem .5rem !important;
-  transition: all .15s !important;
+/* ── 배지 ── */
+.badge {
+  display: inline-block; font-size: .68rem; font-weight: 700;
+  padding: .1rem .45rem; border-radius: 3px; margin-left: .3rem; vertical-align: middle;
 }
+.badge-blue  { background: #eff6ff; color: #3b82f6; }
+.badge-gray  { background: #f1f5f9; color: #64748b; }
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
@@ -229,7 +199,7 @@ EXCLUDE_CODES  = {"10014461","C4900","C2000","C3100"}
 EXCLUDE_BU     = {"기타사업부","수탁사업부","완제사업부"}
 EXCLUDE_OFFICE = {"DW_B2B","DW_CH신사업팀"}
 EXCLUDE_MGR    = {"1202150261"}
-FONT           = "Nanum Gothic,Malgun Gothic,sans-serif"
+FONT           = "NanumSquareNeo,Malgun Gothic,sans-serif"
 
 def _num(v):
     try: return float(str(v).replace(",","").strip())
@@ -253,7 +223,6 @@ def _norm(s):
     s = re.sub(r'[\s\(\)\.\-·\']', '', str(s)).upper()
     for p in ['의료법인','재단법인','학교법인','사회복지법인']:
         if s.startswith(p): s = s[len(p):]
-    s = re.sub(r'^[의재갑을](?=[가-힣])', '', s)
     return s
 
 # ──────────────────────────────────────────────────────────────
@@ -329,7 +298,6 @@ def _parse_rot(v):
     except: return 30
 
 def load_think(file_bytes):
-    """씽크현황에서 씽크 거래처 코드 + 기준회전일 반환 (load_base 보완용)"""
     df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=None, dtype=str)
     codes = {}
     for _, r in df.iloc[4:].iterrows():
@@ -339,12 +307,9 @@ def load_think(file_bytes):
     return codes
 
 def load_think_monthly(file_bytes):
-    """씽크현황 월별 매출/수금 → 누적잔고·현회전일 역산, calculate()용 months 반환"""
     df = pd.read_excel(io.BytesIO(file_bytes), sheet_name='씽크현황', header=None, dtype=str)
     row2 = df.iloc[2].tolist()
     row3 = df.iloc[3].tolist()
-
-    # 월별 컬럼 인덱스 수집 {mo_str: {'매출': col_idx, '수금': col_idx}}
     mo_cols = {}
     cur = None
     for i, (r2, r3) in enumerate(zip(row2, row3)):
@@ -353,18 +318,14 @@ def load_think_monthly(file_bytes):
             cur = s2; mo_cols[cur] = {}
         if cur and str(r3).strip() in ('매출','수금') and str(r3).strip() not in mo_cols[cur]:
             mo_cols[cur][str(r3).strip()] = i
-
-    # 유효한 연월만 (합계·계약금액 제외)
     valid = {k: v for k, v in mo_cols.items()
              if '합계' not in k and '계약' not in k and len(k) == 7}
-
     months_dict = {}
     for _, row in df.iloc[4:].iterrows():
         code = str(row.iloc[2]).strip()
         name = str(row.iloc[3]).strip()
         if not code or code in ('nan','None','판매처'): continue
         기준 = _parse_rot(row.iloc[8])
-
         cum_sale = cum_coll = 0.0
         prev_현회전일 = 0
         for mo_str, cidx in sorted(valid.items()):
@@ -380,15 +341,13 @@ def load_think_monthly(file_bytes):
             coll = _v(cidx['수금']) if '수금' in cidx else 0.0
             cum_sale += sale; cum_coll += coll
             잔고 = cum_sale - cum_coll
-            days = calendar.monthrange(yr, mo)[1]  # 해당 월 실제 일수
+            days = calendar.monthrange(yr, mo)[1]
             if 잔고 <= 0:
                 prev_현회전일 = 0
                 continue
             if sale > 0:
-                # 세금계산서 월말 발행 → 발행 당월은 회전일 1일로 시작
                 현회전일 = 1
             else:
-                # 수금 없으면 해당 월 실제 일수만큼 지연 누적
                 현회전일 = prev_현회전일 + days
             prev_현회전일 = 현회전일
             key = (yr, mo)
@@ -399,7 +358,6 @@ def load_think_monthly(file_bytes):
                 "_기준회전일_override": 기준,
                 "사무소": "", "사업부": "", "담당자": "",
             })
-
     months = [{"yr": yr, "mo": mo, "data": pd.DataFrame(rows)}
               for (yr, mo), rows in sorted(months_dict.items())]
     return months
@@ -523,66 +481,10 @@ def make_full_excel(df):
     ws2.freeze_panes = "C2"
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
 
-@st.dialog("📋 지체보상금 처리 절차", width="large")
-def _show_guide():
-    st.markdown("""
-<div class="guide-step-wrap">
-  <div class="guide-step">
-    <div class="guide-step-num" style="background:#2471a3">1</div>
-    <div class="guide-step-body">
-      <h4>대시보드에서 청구 대상 거래처 확인</h4>
-      <p>기준월 선택 후 청구 발생 거래처 목록에서 거래처별 지체보상금 금액 확인.</p>
-      <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">하단 상세 테이블에서 거래처코드 · 현미수금 · 기준회전일 · 지체보상금 · 계산 근거 확인 가능</div>
-      <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">엑셀 다운로드 버튼으로 해당 월 발생현황 또는 전체 기간 데이터 추출 가능</div>
-    </div>
-  </div>
-  <div class="guide-step">
-    <div class="guide-step-num" style="background:#e67e22">2</div>
-    <div class="guide-step-body">
-      <h4>거래처에 공문 발송</h4>
-      <p>청구 대상 거래처 확정 후 지체보상금 청구 공문 발송.</p>
-      <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">공문에 거래처명 · 기간 · 지체보상금 금액 · 계산 근거 포함</div>
-      <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">대시보드 하단 일괄 공문 다운로드 버튼 활용</div>
-    </div>
-  </div>
-  <div class="guide-step">
-    <div class="guide-step-num" style="background:#27ae60">3</div>
-    <div class="guide-step-body">
-      <h4>거래처 회신 수령</h4>
-      <p>공문 발송 후 거래처로부터 회신 수령.</p>
-      <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">회신 내용 확인 후 금액 이견 없으면 다음 단계 진행</div>
-      <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">금액 이견 발생 시 계산 근거 재확인 후 조율</div>
-    </div>
-  </div>
-  <div class="guide-step">
-    <div class="guide-step-num" style="background:#8e44ad">4</div>
-    <div class="guide-step-body">
-      <h4>전표처리 (잡이익)</h4>
-      <p>거래처 회신 수령 완료 후 지체보상금을 잡이익으로 전표처리.</p>
-      <div class="guide-tip-row" style="border-color:#c0392b;background:#fdf0ef">
-        <b style="color:#c0392b">전표처리 전 반드시 거래처 회신 수령 완료 확인</b>
-      </div>
-    </div>
-  </div>
-</div>""", unsafe_allow_html=True)
-
-
-def _docx_shading(cell, fill_hex):
-    tcPr = cell._tc.get_or_add_tcPr()
-    for tag in list(tcPr):
-        if tag.tag == _dqn('w:shd'):
-            tcPr.remove(tag)
-    shd = _dxml('w:shd')
-    shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), fill_hex)
-    tcPr.append(shd)
-
-
 def _공문_doc_setup(doc):
-    """잔고확인서와 동일한 여백 설정"""
     sec0 = doc.sections[0]
     sec0.top_margin = _Cm(1.3); sec0.bottom_margin = _Cm(1.0)
     sec0.left_margin = _Cm(1.8); sec0.right_margin = _Cm(1.8)
-
     def _rf(run, name='맑은 고딕'):
         rPr = run._r.get_or_add_rPr()
         for t in list(rPr):
@@ -590,19 +492,16 @@ def _공문_doc_setup(doc):
         rf = _dxml('w:rFonts')
         rf.set(_dqn('w:ascii'), name); rf.set(_dqn('w:eastAsia'), name); rf.set(_dqn('w:hAnsi'), name)
         rPr.insert(0, rf)
-
     def _r(para, text, bold=False, size=10, color=None, name='맑은 고딕'):
         run = para.add_run(text)
         run.bold = bold; run.font.size = _Pt(size); run.font.name = name
         if color: run.font.color.rgb = _RGB.from_string(color)
         _rf(run, name); return run
-
     def _p(text='', bold=False, size=10, align=_WDA.LEFT, sa=2, color=None):
         p = doc.add_paragraph(); p.alignment = align
         p.paragraph_format.space_after = _Pt(sa); p.paragraph_format.space_before = _Pt(0)
         if text: _r(p, text, bold=bold, size=size, color=color)
         return p
-
     def _bline(side='bottom', sa=6):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = _Pt(sa); p.paragraph_format.space_before = _Pt(0)
@@ -612,85 +511,67 @@ def _공문_doc_setup(doc):
         bdr.set(_dqn('w:val'), 'single'); bdr.set(_dqn('w:sz'), '18')
         bdr.set(_dqn('w:space'), '1'); bdr.set(_dqn('w:color'), '1A2A6C')
         pBdr.append(bdr); pPr.append(pBdr)
-
     def _tc(cell, text, bold=False, size=9.5, color=None, fill=None, align=_WDA.LEFT):
         para = cell.paragraphs[0]
         run = para.add_run(str(text))
         run.bold = bold; run.font.size = _Pt(size); run.font.name = '맑은 고딕'
         if color: run.font.color.rgb = _RGB.from_string(color)
         _rf(run); para.alignment = align
-        if fill: _docx_shading(cell, fill)
-
-    def _footer(sig_addr="서울시 강남구 봉은사로 114길 12"):
+        if fill:
+            tcPr = cell._tc.get_or_add_tcPr()
+            for tag in list(tcPr):
+                if tag.tag == _dqn('w:shd'): tcPr.remove(tag)
+            shd = _dxml('w:shd')
+            shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), fill)
+            tcPr.append(shd)
+    def _sig():
+        p1 = _p(sa=0, align=_WDA.RIGHT); _r(p1, '서울시 강남구 봉은사로 114길 12', size=9.5)
+        p2 = _p(sa=0, align=_WDA.RIGHT); _r(p2, '주 식 회 사  대 웅 제 약', size=10)
+        p3 = _p(sa=3, align=_WDA.RIGHT); _r(p3, '대 표 이 사   이 창 재', size=10)
+    def _footer():
         _bline('top', sa=4)
         _p('DAEWOONG PHARMACEUTICAL CO., LTD.', bold=True, size=10, align=_WDA.CENTER, sa=0)
         _p('대웅제약 주식회사', size=8.5, align=_WDA.CENTER, sa=0)
-
-    def _sig(sig_addr="서울시 강남구 봉은사로 114길 12"):
-        p1 = _p(sa=0, align=_WDA.RIGHT)
-        _r(p1, sig_addr, size=9.5)
-        p2 = _p(sa=0, align=_WDA.RIGHT)
-        _r(p2, '주 식 회 사  대 웅 제 약', size=10)
-        p3 = _p(sa=3, align=_WDA.RIGHT)
-        _r(p3, '대 표 이 사   이 창 재', size=10)
-
     def _letterhead(판매처명, 제목, doc_no_suffix):
         from datetime import date as _d
         today = _d.today()
-        # 레터헤드
-        p_lh = _p(sa=1)
-        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+        p_lh = _p(sa=1); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
         _bline('bottom', sa=3)
-        # 문서번호 / 날짜
         th = doc.add_table(rows=1, cols=2)
-        for cell in th.rows[0].cells:
-            cell._tc.get_or_add_tcPr()
+        for cell in th.rows[0].cells: cell._tc.get_or_add_tcPr()
         _tc(th.rows[0].cells[0], f'문서번호 : {doc_no_suffix}')
         _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
         _p(sa=2)
-        # 수신/제목
-        p = _p(sa=1)
-        _r(p, '수  신', bold=True, size=10.5)
-        _r(p, f'  :  {판매처명} 귀중', size=10.5)
-        p = _p(sa=3)
-        _r(p, '제  목', bold=True, size=10.5)
-        _r(p, f'  :  {제목}', bold=True, size=10.5)
+        p = _p(sa=1); _r(p, '수  신', bold=True, size=10.5); _r(p, f'  :  {판매처명} 귀중', size=10.5)
+        p = _p(sa=3); _r(p, '제  목', bold=True, size=10.5); _r(p, f'  :  {제목}', bold=True, size=10.5)
         _bline('top', sa=5)
         return today
-
     return _r, _p, _bline, _tc, _sig, _footer, _letterhead
-
 
 def make_공문_word(row):
     if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
     doc = _DocxDoc()
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
-
     판매처명 = str(row.get("판매처명", ""))
     기준월   = str(row.get("기준월", ""))
-    today = _letterhead(판매처명, "지체보상금 청구의 건",
-                        f"지체-{기준월.replace('-','')}-{판매처명[:4]}")
-
-    # 본문 1
+    _letterhead(판매처명, "지체보상금 청구의 건", f"지체-{기준월.replace('-','')}-{판매처명[:4]}")
     _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
     _r(p, 기준월, bold=True, size=10)
     _r(p, ' 기준 지체보상금이 아래와 같이 발생하였기에 청구드립니다.', size=10)
-
-    # 청구 내역 표
     _p('─ 청구 내역', bold=True, size=10, sa=2)
     details = [
-        ('· 기준월',         기준월),
+        ('· 기준월', 기준월),
         ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
         ('· 유효 기준회전일', f'{int(row["유효기준회전일"])}일'),
-        ('· 현 회전일',       f'{int(row["현 회전일"])}일'),
+        ('· 현 회전일', f'{int(row["현 회전일"])}일'),
         ('· 지연일수 (누적)', f'{int(row["지연일수(누적)"])}일'),
-        ('· 청구 증분일수',   f'{int(row["청구 증분일수"])}일'),
-        ('· 요율',           str(row["요율"])),
-        ('· 지체보상금',     f'{int(row["지체보상금"]):,} 원'),
-        ('· 계산 근거',      str(row.get("계산 근거", ""))),
+        ('· 청구 증분일수', f'{int(row["청구 증분일수"])}일'),
+        ('· 요율', str(row["요율"])),
+        ('· 지체보상금', f'{int(row["지체보상금"]):,} 원'),
+        ('· 계산 근거', str(row.get("계산 근거", ""))),
     ]
     tbl = doc.add_table(rows=len(details), cols=2); tbl.style = 'Table Grid'
     for i, (lbl, val) in enumerate(details):
@@ -698,8 +579,6 @@ def make_공문_word(row):
         _tc(tbl.rows[i].cells[1], val, color='C0392B' if '지체보상금' in lbl else None)
     for r_obj in tbl.rows:
         r_obj.cells[0].width = _Cm(5.5); r_obj.cells[1].width = _Cm(9.5)
-
-    # 참고 (사업자번호/계약유형)
     사업자번호 = str(row.get("사업자번호", "")).strip()
     계약유형   = str(row.get("계약유형",   "")).strip()
     parts = [x for x in [
@@ -708,92 +587,72 @@ def make_공문_word(row):
     ] if x]
     if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=3, color='666666')
     else:     _p(sa=3)
-
-    # 본문 2
     _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
     _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
-
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
-    _sig()
-    _footer()
-
+    _sig(); _footer()
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
-
 
 def make_공문_word_cumulative(vendor_df):
     if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
     doc = _DocxDoc()
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
-
-    first   = vendor_df.sort_values("기준월").iloc[0]
-    months  = sorted(vendor_df["기준월"].unique())
-    period  = f"{months[0]} ~ {months[-1]}"
+    first = vendor_df.sort_values("기준월").iloc[0]
+    months = sorted(vendor_df["기준월"].unique())
+    period = f"{months[0]} ~ {months[-1]}"
     판매처명 = str(first.get("판매처명", ""))
-    total   = int(vendor_df["지체보상금"].sum())
-
+    total = int(vendor_df["지체보상금"].sum())
     from datetime import date as _d
     today = _d.today()
     _letterhead(판매처명, "지체보상금 청구의 건 (전체 기간)",
                 f"지체-{today.strftime('%Y')}-전체-{판매처명[:4]}")
-
-    # 본문 1
     _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
     _r(p, period, bold=True, size=10)
     _r(p, ' 기간 동안 발생한 지체보상금 합계를 아래와 같이 청구드립니다.', size=10)
-
-    # 월별 내역 표
     _p('─ 월별 청구 내역', bold=True, size=10, sa=2)
     hdrs = ["기준월", "현 미수금", "기준회전일", "현 회전일", "청구 증분일수", "요율", "지체보상금"]
     sorted_df = vendor_df.sort_values("기준월")
     n = len(sorted_df)
     tbl = doc.add_table(rows=n + 2, cols=len(hdrs)); tbl.style = 'Table Grid'
-
     for ci, h in enumerate(hdrs):
         _tc(tbl.rows[0].cells[ci], h, bold=True, color='FFFFFF', fill='1A2A6C', align=_WDA.CENTER)
-
     for ri, (_, r) in enumerate(sorted_df.iterrows(), start=1):
         bg = 'F0F0F8' if ri % 2 == 0 else None
         vals = [r["기준월"], f'{int(r["현 미수금"]):,}', f'{int(r["유효기준회전일"])}',
                 f'{int(r["현 회전일"])}', f'{int(r["청구 증분일수"])}', r["요율"], f'{int(r["지체보상금"]):,}']
         for ci, v in enumerate(vals):
             _tc(tbl.rows[ri].cells[ci], v, size=9.5, fill=bg, align=_WDA.CENTER)
-
-    # 합계 행
     last = tbl.rows[n + 1]
     _tc(last.cells[0], "합  계", bold=True, fill='E8EDF5', align=_WDA.CENTER)
     for ci in range(1, len(hdrs) - 1):
-        _docx_shading(last.cells[ci], 'E8EDF5')
+        tcPr = last.cells[ci]._tc.get_or_add_tcPr()
+        for tag in list(tcPr):
+            if tag.tag == _dqn('w:shd'): tcPr.remove(tag)
+        shd = _dxml('w:shd')
+        shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), 'E8EDF5')
+        tcPr.append(shd)
     _tc(last.cells[-1], f'{total:,}', bold=True, color='C0392B', fill='E8EDF5', align=_WDA.CENTER)
-
     widths = [_Cm(2.2), _Cm(3.0), _Cm(1.8), _Cm(1.8), _Cm(2.2), _Cm(1.5), _Cm(2.5)]
     for r_obj in tbl.rows:
         for ci, w in enumerate(widths): r_obj.cells[ci].width = w
-
-    # 합계 강조
     _p(sa=2)
     p_tot = _p(sa=5, align=_WDA.RIGHT)
     _r(p_tot, '※ 합계 청구금액 : ', bold=True, size=11)
     _r(p_tot, f'{total:,} 원', bold=True, size=13, color='C0392B')
-
-    # 본문 2
     _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
     _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
-
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
-    _sig()
-    _footer()
-
+    _sig(); _footer()
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
-
 
 def make_공문_zip(df, month_label):
     buf = io.BytesIO()
@@ -802,13 +661,11 @@ def make_공문_zip(df, month_label):
         return f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for _, row in df[df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).iterrows():
-            row = row.copy()
-            row["계산 근거"] = _calc_str(row)
+            row = row.copy(); row["계산 근거"] = _calc_str(row)
             safe = re.sub(r'[\\/:*?"<>|]', '_', str(row["판매처명"]).strip())
             fname = f"지체보상금청구_{safe}_{row['기준월']}.docx"
             zf.writestr(fname, make_공문_word(row))
     return buf.getvalue()
-
 
 def make_공문_zip_cumulative(result_df):
     charge_df = result_df[result_df["지체보상금"] > 0]
@@ -821,20 +678,18 @@ def make_공문_zip_cumulative(result_df):
             zf.writestr(fname, make_공문_word_cumulative(grp))
     return buf.getvalue()
 
-
 # ──────────────────────────────────────────────────────────────
-BASE_PATH  = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
-MO_FOLDER  = Path("input/월별잔고회전일")
+BASE_PATH = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
+MO_FOLDER = Path("input/월별잔고회전일")
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
-CT_LIST    = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
-CT_PATH    = CT_LIST[0] if CT_LIST else None
+CT_LIST   = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
+CT_PATH   = CT_LIST[0] if CT_LIST else None
 
 @st.cache_data(show_spinner=False)
 def _read_mo_folder(folder_str: str, _mtime: float = 0):
     folder = Path(folder_str)
     files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
-    if not files:
-        return None
+    if not files: return None
     dfs = [pd.read_excel(f, dtype=str).dropna(how="all") for f in files]
     combined = pd.concat(dfs, ignore_index=True)
     buf = io.BytesIO()
@@ -847,64 +702,30 @@ def _read_bytes(path_str: str):
     p = Path(path_str)
     return p.read_bytes() if p.exists() else None
 
-# ──────────────────────────────────────────────────────────────
-# 파일 관리 (메인 영역 expander)
-# ──────────────────────────────────────────────────────────────
-f_monthly = f_base = f_contract = None
-with st.expander("📁 파일 관리", expanded=False):
-    use_default = st.checkbox("input 폴더 기본 파일 사용", value=True)
-    if use_default:
-        _mo_files = (sorted(MO_FOLDER.glob("*.xlsx")) + sorted(MO_FOLDER.glob("*.xls"))) if MO_FOLDER.exists() else []
-        _mo_lbl = f"월별 잔고 ({len(_mo_files)}개 파일)" if _mo_files else "월별 잔고"
-        _scols = st.columns(3)
-        for _ci, (_lbl, _ok) in enumerate([(_mo_lbl, bool(_mo_files)),
-                         ("기준회전일", BASE_PATH.exists()),
-                         ("계약서", CT_PATH is not None)]):
-            _c = "#3dbb85" if _ok else "#e05555"
-            _ic = "✓" if _ok else "✗"
-            _scols[_ci].markdown(f'<span style="color:{_c};font-size:.85rem">{_ic} {_lbl}</span>', unsafe_allow_html=True)
-    else:
-        _uc1, _uc2, _uc3 = st.columns(3)
-        f_monthly  = _uc1.file_uploader("월별 잔고",   type=["xlsx","xls"])
-        f_base     = _uc2.file_uploader("기준회전일",  type=["xlsx","xls"])
-        f_contract = _uc3.file_uploader("계약서 파일", type=["xlsx","xls"])
-
-# ──────────────────────────────────────────────────────────────
-# 데이터
-# ──────────────────────────────────────────────────────────────
-if use_default:
-    _mo_result = _read_mo_folder(str(MO_FOLDER), _mtime=max((f.stat().st_mtime for f in (sorted(MO_FOLDER.glob("*.xlsx"))+sorted(MO_FOLDER.glob("*.xls"))) if f.exists()), default=0) if MO_FOLDER.exists() else 0) if MO_FOLDER.exists() else None
-    m_b, _mo_names = _mo_result if _mo_result else (None, [])
-    b_b = _read_bytes(str(BASE_PATH))
-    c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
-    t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
-else:
-    m_b = f_monthly.read()  if f_monthly  else None
-    _mo_names = [f_monthly.name] if f_monthly else []
-    b_b = f_base.read()     if f_base     else None
-    c_b = f_contract.read() if f_contract else None
-    t_b = THINK_PATH.read_bytes() if THINK_PATH else None
+# ── 파일 로드
+_mo_files = (sorted(MO_FOLDER.glob("*.xlsx")) + sorted(MO_FOLDER.glob("*.xls"))) if MO_FOLDER.exists() else []
+_mo_result = _read_mo_folder(str(MO_FOLDER), _mtime=max((f.stat().st_mtime for f in _mo_files if f.exists()), default=0)) if MO_FOLDER.exists() else None
+m_b, _mo_names = _mo_result if _mo_result else (None, [])
+b_b = _read_bytes(str(BASE_PATH))
+c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
+t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 
 def _build_org_map(m_b):
-    """SAP 월별 파일에서 판매처코드 → {사무소, 사업부, 담당자} 매핑"""
-    if not m_b:
-        return {}
+    if not m_b: return {}
     try:
         df = pd.read_excel(io.BytesIO(m_b), dtype=str).dropna(how="all")
         df.columns = [str(c).strip() for c in df.columns]
         org_map = {}
         for _, r in df.iterrows():
             code = str(r.get("판매처","")).strip()
-            if not code or code == "nan":
-                continue
+            if not code or code == "nan": continue
             org_map[code] = {
                 "사무소": str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
                 "사업부": str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
                 "담당자": str(r.get("담당자명","")).strip() if "담당자명" in r.index else "",
             }
         return org_map
-    except Exception:
-        return {}
+    except Exception: return {}
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b):
@@ -916,9 +737,6 @@ def run_calc(m_b, b_b, c_b, t_b):
     think_rot = load_think(t_b) if t_b else None
     bdf = load_base(b_b, cmap, think_rot)
     months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
-
-    # 씽크현황+SAP 월별 둘 다 있을 때: DW07/DW08 거래처는 SAP 잔고를 최종 기준으로 사용
-    # SAP 잔고 = 0 이거나 SAP에 없으면 해당 월 제거 (씽크현황 누적계산 오류 방지)
     if t_b and m_b:
         sap_months = load_monthly(m_b)
         sap_bal: dict = {}
@@ -932,25 +750,22 @@ def run_calc(m_b, b_b, c_b, t_b):
             for _i, _r in _df[~_df["채널"].isin(_씽크ch)].iterrows():
                 _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
                 if _k in sap_bal:
-                    _df.at[_i, "잔고"]     = sap_bal[_k][0]
+                    _df.at[_i, "잔고"] = sap_bal[_k][0]
                     _df.at[_i, "현회전일"] = sap_bal[_k][1]
                 else:
-                    _df.at[_i, "잔고"] = 0  # SAP에 없음 = 수금 완료로 처리
+                    _df.at[_i, "잔고"] = 0
             _me["data"] = _df[_df["잔고"] > 0].reset_index(drop=True)
-
     org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
-    # org 정보 결과에 병합
     if org_map and not result.empty:
         result["사무소"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사무소", ""))
         result["사업부"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사업부", ""))
         result["담당자"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("담당자", ""))
-    # 계약서 마스터 정보 병합
     if cmap and not result.empty:
         result["계약유형"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("계약유형", ""))
         result["사업자번호"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("사업자번호", ""))
     else:
-        if "계약유형" not in result.columns:  result["계약유형"]  = ""
+        if "계약유형"  not in result.columns: result["계약유형"]  = ""
         if "사업자번호" not in result.columns: result["사업자번호"] = ""
     return result, cmap, n_yes, n_no
 
@@ -959,132 +774,241 @@ def run_calc(m_b, b_b, c_b, t_b):
 # ──────────────────────────────────────────────────────────────
 today_str = date.today().strftime("%Y. %m. %d")
 st.markdown(f"""
-<style>
-#guide-chk {{ display: none; }}
-#guide-chk ~ .ph-guide-overlay {{ display: none; }}
-#guide-chk:checked ~ .ph-guide-overlay {{ display: flex; }}
-.ph-guide-btn {{
-  cursor: pointer;
-  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.28);
-  color: #b0cfe0; padding: .3rem .85rem; border-radius: 5px;
-  font-size: .77rem; font-weight: 700; white-space: nowrap;
-  font-family: 'NanumSquareNeo', sans-serif; transition: all .15s;
-  user-select: none;
-}}
-.ph-guide-btn:hover {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
-#guide-chk:checked ~ .ph-guide-overlay + label.ph-guide-btn {{ background: rgba(255,255,255,.18); color: #e2f0fa; }}
-.ph-guide-overlay {{
-  position: fixed; inset: 0; background: rgba(0,0,0,.52);
-  z-index: 9998; align-items: center; justify-content: center; padding: 1rem;
-}}
-.ph-guide-backdrop {{
-  position: absolute; inset: 0; cursor: default; z-index: 0;
-}}
-.ph-guide-modal {{
-  background: #fff; border-radius: 12px; padding: 1.6rem 2rem 1.4rem;
-  max-width: 580px; width: 100%; max-height: 82vh; overflow-y: auto;
-  box-shadow: 0 8px 30px rgba(0,0,0,.25); position: relative; z-index: 1;
-}}
-.ph-guide-close {{
-  cursor: pointer; background: #f2f4f8; border: 1px solid #dde3ef;
-  color: #666; padding: .22rem .7rem; border-radius: 5px;
-  font-size: .78rem; font-weight: 700; font-family: 'NanumSquareNeo', sans-serif;
-  user-select: none;
-}}
-.ph-guide-close:hover {{ background: #e5e9f2; color: #333; }}
-</style>
-<div class="ph">
-  <div class="ph-l">
-    <div class="ph-title">지체보상금 대시보드</div>
-    <div class="ph-sub">DW11 씽크채널 · 월말 순실잔고 × 증분지연일수 × 요율</div>
+<div class="top-header">
+  <div>
+    <div class="hd-title">지체보상금 대시보드</div>
+    <div class="hd-sub">DW07 · DW11 채널 | 월말 순실잔고 × 증분지연일수 × 1/1000</div>
   </div>
-  <div style="display:flex;align-items:center;gap:.6rem;position:relative">
-    <div class="ph-badge">{today_str} 기준</div>
-    <input type="checkbox" id="guide-chk">
-    <div class="ph-guide-overlay">
-      <label for="guide-chk" class="ph-guide-backdrop"></label>
-      <div class="ph-guide-modal">
-        <div style="display:flex;justify-content:space-between;align-items:center;
-                    margin-bottom:1rem;padding-bottom:.6rem;border-bottom:2px solid #eaecf2">
-          <span style="font-size:1rem;font-weight:800;color:#1a2535">📋 지체보상금 처리 절차</span>
-          <label for="guide-chk" class="ph-guide-close">✕ 닫기</label>
-        </div>
-        <div class="guide-step-wrap">
-          <div class="guide-step">
-            <div class="guide-step-num" style="background:#2471a3">1</div>
-            <div class="guide-step-body">
-              <h4>대시보드에서 청구 대상 거래처 확인</h4>
-              <p>기준월 선택 후 청구 발생 거래처 목록에서 거래처별 지체보상금 금액 확인.</p>
-              <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">하단 상세 테이블에서 거래처코드 · 현미수금 · 기준회전일 · 지체보상금 · 계산 근거 확인 가능</div>
-              <div class="guide-tip-row" style="border-color:#2471a3;background:#eaf1f8">일괄 공문 다운로드 버튼으로 거래처별 청구서 ZIP 추출 가능</div>
-            </div>
-          </div>
-          <div class="guide-step">
-            <div class="guide-step-num" style="background:#e67e22">2</div>
-            <div class="guide-step-body">
-              <h4>거래처에 공문 발송</h4>
-              <p>청구 대상 거래처 확정 후 지체보상금 청구 공문 발송.</p>
-              <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">공문에 거래처명 · 기간 · 지체보상금 금액 · 계산 근거 포함</div>
-              <div class="guide-tip-row" style="border-color:#e67e22;background:#fdf3e7">대시보드 하단 엑셀로 추출한 데이터를 공문 작성에 활용</div>
-            </div>
-          </div>
-          <div class="guide-step">
-            <div class="guide-step-num" style="background:#27ae60">3</div>
-            <div class="guide-step-body">
-              <h4>거래처 회신 수령</h4>
-              <p>공문 발송 후 거래처로부터 회신 수령.</p>
-              <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">회신 내용 확인 후 금액 이견 없으면 다음 단계 진행</div>
-              <div class="guide-tip-row" style="border-color:#27ae60;background:#eafaf1">금액 이견 발생 시 계산 근거 재확인 후 조율</div>
-            </div>
-          </div>
-          <div class="guide-step">
-            <div class="guide-step-num" style="background:#8e44ad">4</div>
-            <div class="guide-step-body">
-              <h4>전표처리 (잡이익)</h4>
-              <p>거래처 회신 수령 완료 후 지체보상금을 잡이익으로 전표처리.</p>
-              <div class="guide-tip-row" style="border-color:#c0392b;background:#fdf0ef">
-                <b style="color:#c0392b">전표처리 전 반드시 거래처 회신 수령 완료 확인</b>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <label for="guide-chk" class="ph-guide-btn">가이드 확인하기 ↗</label>
-  </div>
+  <div class="hd-badge">{today_str} 기준</div>
 </div>""", unsafe_allow_html=True)
 
-result_df = contract_map = None
-if m_b and b_b:
-    try:
-        with st.spinner("계산 중..."):
-            result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b)
-    except Exception as e:
-        st.error(f"오류: {e}"); st.stop()
-else:
-    st.info("왼쪽에서 파일을 선택하거나 업로드하세요."); st.stop()
+# ── 데이터 계산
+if not (m_b and b_b):
+    st.warning("input 폴더에 월별잔고 파일 또는 기준회전일 파일이 없습니다.")
+    st.stop()
+
+with st.spinner("데이터 계산 중..."):
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
 
-
 months_sorted = sorted(result_df["기준월"].unique())
 mo_sum = result_df.groupby("기준월")["지체보상금"].sum()
 
-# ── 월 선택 ──────────────────────────────────────────────────
-if "sel_mo" not in st.session_state or st.session_state.sel_mo not in months_sorted:
-    st.session_state.sel_mo = months_sorted[-1]
+# ──────────────────────────────────────────────────────────────
+# 메인 탭: 집계 | 상세
+# ──────────────────────────────────────────────────────────────
+tab_agg, tab_detail = st.tabs(["📊  집계표", "🔍  월별 상세"])
 
-# 연도 목록 추출
-years_avail = sorted(set(m.split("-")[0] for m in months_sorted))
-if "sel_yr" not in st.session_state or st.session_state.sel_yr not in years_avail:
-    st.session_state.sel_yr = st.session_state.sel_mo.split("-")[0]
+# ══════════════════════════════════════════════════════════════
+# 탭 1: 집계표
+# ══════════════════════════════════════════════════════════════
+with tab_agg:
+    # ── 전체 기간 KPI ─────────────────────────────────────────
+    total_all   = int(result_df["지체보상금"].sum())
+    total_vend  = result_df[result_df["지체보상금"] > 0]["판매처코드"].nunique()
+    total_months = len([m for m in months_sorted if mo_sum.get(m, 0) > 0])
+    best_mo      = mo_sum.idxmax() if len(mo_sum) > 0 else "-"
+    best_mo_amt  = int(mo_sum.max()) if len(mo_sum) > 0 else 0
+    avg_mo_amt   = int(total_all / total_months) if total_months > 0 else 0
+    cur_yr = str(date.today().year)
+    ann_total = int(result_df[result_df["기준월"].str.startswith(cur_yr)]["지체보상금"].sum())
 
-with st.container():
-    st.markdown('<div style="font-size:.7rem;font-weight:800;color:#a0aec0;letter-spacing:.1em;margin-bottom:.6rem">기준월 선택</div>', unsafe_allow_html=True)
-    yr_c = st.columns([1]*len(years_avail) + [6-len(years_avail)] if len(years_avail) < 6 else [1]*len(years_avail))
+    st.markdown(f"""
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-lbl">전체 기간 지체보상금</div>
+        <div class="kpi-val">{fmt_won(total_all, short=True)}</div>
+        <div class="kpi-sub">{months_sorted[0]} ~ {months_sorted[-1]}</div>
+      </div>
+      <div class="kpi-card indigo">
+        <div class="kpi-lbl">{cur_yr}년 누계</div>
+        <div class="kpi-val">{fmt_won(ann_total, short=True)}</div>
+        <div class="kpi-sub">{cur_yr}년 발생 합계</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-lbl">청구 거래처 수 (전 기간)</div>
+        <div class="kpi-val">{total_vend}<span class="kpi-unit">개</span></div>
+        <div class="kpi-sub">지체보상금 발생 고유 거래처</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-lbl">최고 발생 월</div>
+        <div class="kpi-val">{mo_label(best_mo) if best_mo != "-" else "-"}</div>
+        <div class="kpi-sub">{fmt_won(best_mo_amt)}</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_tbl, col_chart = st.columns([1, 1], gap="large")
+
+    with col_tbl:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>월별 집계표</div>', unsafe_allow_html=True)
+
+        # 월별 집계 테이블 구성
+        agg_rows = []
+        for mo in months_sorted:
+            mdf = result_df[result_df["기준월"] == mo]
+            agg_rows.append({
+                "기준월": mo,
+                "청구 거래처": int((mdf["지체보상금"] > 0).sum()),
+                "청구 건수": int((mdf["지체보상금"] > 0).sum()),
+                "지체보상금 (원)": int(mdf["지체보상금"].sum()),
+            })
+        agg_df = pd.DataFrame(agg_rows)
+        # 합계 행 추가
+        sum_row = pd.DataFrame([{
+            "기준월": "▶ 합계",
+            "청구 거래처": "-",
+            "청구 건수": int(agg_df["청구 건수"].sum()),
+            "지체보상금 (원)": int(agg_df["지체보상금 (원)"].sum()),
+        }])
+        agg_display = pd.concat([agg_df, sum_row], ignore_index=True)
+
+        def _agg_style(row):
+            if row["기준월"] == "▶ 합계":
+                return ["background:#eff6ff;font-weight:bold;color:#1e40af"] * len(row)
+            if row["지체보상금 (원)"] and row["지체보상금 (원)"] != "-" and int(row["지체보상금 (원)"]) > 0:
+                return ["background:#fff7ed"] * len(row)
+            return [""] * len(row)
+
+        st.dataframe(
+            agg_display.style
+                .apply(_agg_style, axis=1)
+                .format({"지체보상금 (원)": lambda v: f"{int(v):,}" if str(v).lstrip("-").isdigit() else v}),
+            use_container_width=True,
+            height=min(55 * len(agg_display) + 55, 620),
+            hide_index=True,
+            column_config={
+                "기준월":         st.column_config.TextColumn("기준월",       width=110),
+                "청구 거래처":    st.column_config.TextColumn("청구 거래처",  width=100),
+                "청구 건수":      st.column_config.TextColumn("청구 건수",    width=90),
+                "지체보상금 (원)": st.column_config.TextColumn("지체보상금",   width=160),
+            },
+        )
+
+    with col_chart:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>월별 지체보상금 추이</div>', unsafe_allow_html=True)
+
+        x_all = [mo_label(m) for m in months_sorted]
+        y_all = [int(mo_sum.get(m, 0)) / 10000 for m in months_sorted]
+        bar_colors_all = ["#3b82f6" if int(mo_sum.get(m, 0)) > 0 else "#e2e8f0" for m in months_sorted]
+        cum_all = []
+        run = 0
+        for v in y_all:
+            run += v
+            cum_all.append(round(run, 1))
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=x_all, y=cum_all, name="누적",
+            mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
+            fill="tozeroy", fillcolor="rgba(59,130,246,0.07)",
+            hoverinfo="skip", yaxis="y2", showlegend=False,
+        ))
+        fig.add_trace(go.Bar(
+            x=x_all, y=y_all, name="월별",
+            marker_color=bar_colors_all, marker_line_width=0,
+            text=[f"{v:,.0f}만" if v > 0 else "" for v in y_all],
+            textposition="outside", cliponaxis=False,
+            textfont=dict(size=9, color="#64748b"),
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
+            yaxis="y1",
+        ))
+        fig.add_trace(go.Scatter(
+            x=x_all, y=[v if v > 0 else None for v in cum_all], name="누적",
+            mode="lines+markers",
+            line=dict(color="#f59e0b", width=2.5),
+            marker=dict(size=6, color="#f59e0b", line=dict(color="#fff", width=2)),
+            hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
+            yaxis="y2",
+        ))
+        mo_max = max(y_all) if max(y_all) > 0 else 1
+        cu_max = max(cum_all) if max(cum_all) > 0 else 1
+        fig.update_layout(
+            plot_bgcolor="white", paper_bgcolor="white",
+            margin=dict(t=10, b=10, l=50, r=60),
+            height=460,
+            bargap=0.35,
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.04,
+                        font=dict(size=11, family=FONT), bgcolor="rgba(0,0,0,0)"),
+            yaxis=dict(gridcolor="#f1f5f9", tickformat=",d", zeroline=False,
+                       range=[0, mo_max * 1.6], tickfont=dict(size=10), title=None, showline=False),
+            yaxis2=dict(overlaying="y", side="right", range=[0, cu_max * 1.25],
+                        tickformat=",d", tickfont=dict(size=10),
+                        showgrid=False, title=None, showline=False),
+            xaxis=dict(showgrid=False, tickfont=dict(size=10), showline=False, tickangle=-40),
+            font=dict(family=FONT),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    # ── 전체 기간 거래처별 누계표 ──────────────────────────────
+    st.markdown('<div class="sec-hd"><span class="sec-bar"></span>거래처별 누계 (전체 기간)</div>', unsafe_allow_html=True)
+
+    pv_all = result_df.pivot_table(
+        index=["판매처코드","판매처명"], columns="기준월",
+        values="지체보상금", aggfunc="sum", fill_value=0,
+    ).reset_index()
+    pv_all.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv_all.columns]
+    pv_all["합계"] = pv_all.iloc[:, 2:].sum(axis=1)
+    pv_all = pv_all[pv_all["합계"] > 0].sort_values("합계", ascending=False).reset_index(drop=True)
+    pv_all.index = pv_all.index + 1
+
+    mo_cols_pv = [c for c in pv_all.columns if c not in ["판매처코드","판매처명"]]
+    def _heat(s):
+        mx = s.max() if s.max() > 0 else 1
+        return [f"background-color: rgba(59,130,246,{v/mx*0.5:.2f})" for v in s]
+
+    pv_event = st.dataframe(
+        pv_all.style.format({c: "{:,.0f}" for c in mo_cols_pv}).apply(_heat, subset=["합계"]),
+        use_container_width=True, height=420,
+        on_select="rerun", selection_mode="multi-row", key="pv_all_df",
+    )
+    # 선택된 행 → 공문 다운로드
+    _pv_pos = pv_event.selection.rows if pv_event.selection.rows else []
+    if _pv_pos:
+        _pv_codes = [pv_all.iloc[i]["판매처코드"] for i in _pv_pos if i < len(pv_all)]
+        _pv_df = result_df[result_df["판매처코드"].isin(_pv_codes) & (result_df["지체보상금"] > 0)]
+        n_pv = _pv_df["판매처코드"].nunique()
+        ca, cb, _ = st.columns([2, 2, 4])
+        with ca:
+            st.download_button(
+                f"📁 선택 전체기간 공문 ({n_pv}개사)",
+                data=make_공문_zip_cumulative(_pv_df) if n_pv else b"",
+                file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
+                mime="application/zip", disabled=(n_pv == 0),
+                use_container_width=True, key="btn_pv_docx",
+            )
+        with cb:
+            st.download_button(
+                "⬇ 전체 기간 엑셀",
+                data=make_full_excel(result_df),
+                file_name=f"지체보상금_전체_{date.today():%Y%m%d}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True, key="btn_agg_full_excel",
+            )
+    else:
+        st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
+
+
+# ══════════════════════════════════════════════════════════════
+# 탭 2: 월별 상세
+# ══════════════════════════════════════════════════════════════
+with tab_detail:
+
+    # ── 연도 / 월 선택기 ─────────────────────────────────────
+    years_avail = sorted(set(m.split("-")[0] for m in months_sorted))
+
+    if "sel_mo" not in st.session_state or st.session_state.sel_mo not in months_sorted:
+        st.session_state.sel_mo = months_sorted[-1]
+    if "sel_yr" not in st.session_state or st.session_state.sel_yr not in years_avail:
+        st.session_state.sel_yr = st.session_state.sel_mo.split("-")[0]
+
+    # 연도 버튼
+    st.markdown('<div class="yr-label">연도 선택</div>', unsafe_allow_html=True)
+    yr_cols = st.columns(len(years_avail) + 6)
     for i, yr in enumerate(years_avail):
-        with yr_c[i]:
+        with yr_cols[i]:
             if st.button(f"{yr}년", key=f"yr_{yr}",
                          type="primary" if yr == st.session_state.sel_yr else "secondary",
                          use_container_width=True):
@@ -1094,334 +1018,266 @@ with st.container():
                     st.session_state.sel_mo = yr_months[-1]
                 st.rerun()
 
+    # 월 버튼 (12개 그리드)
+    st.markdown('<div style="margin-top:.3rem"><div class="yr-label">월 선택</div></div>', unsafe_allow_html=True)
     yr_months = [m for m in months_sorted if m.startswith(st.session_state.sel_yr)]
     yr_months_set = set(yr_months)
-    has_second_row = any(int(m.split("-")[1]) > 6 for m in yr_months)
-    for row_start in ([1, 7] if has_second_row else [1]):
-        mc = st.columns(6)
-        for i, col in enumerate(mc):
-            mo = row_start + i
-            m  = f"{st.session_state.sel_yr}-{mo:02d}"
+    mo_cols_row1 = st.columns(6)
+    mo_cols_row2 = st.columns(6)
+    for i in range(6):
+        mo = i + 1
+        m = f"{st.session_state.sel_yr}-{mo:02d}"
+        with mo_cols_row1[i]:
             if m in yr_months_set:
-                with col:
-                    if st.button(f"{mo}월", key=f"mo_{m}",
-                                 type="primary" if m == st.session_state.sel_mo else "secondary",
-                                 use_container_width=True):
-                        st.session_state.sel_mo = m; st.rerun()
+                if st.button(f"{mo}월", key=f"mo_{m}",
+                             type="primary" if m == st.session_state.sel_mo else "secondary",
+                             use_container_width=True):
+                    st.session_state.sel_mo = m; st.rerun()
+            else:
+                st.button(f"{mo}월", key=f"mo_dis_{m}", disabled=True, use_container_width=True)
+    for i in range(6):
+        mo = i + 7
+        m = f"{st.session_state.sel_yr}-{mo:02d}"
+        with mo_cols_row2[i]:
+            if m in yr_months_set:
+                if st.button(f"{mo}월", key=f"mo_{m}",
+                             type="primary" if m == st.session_state.sel_mo else "secondary",
+                             use_container_width=True):
+                    st.session_state.sel_mo = m; st.rerun()
+            else:
+                st.button(f"{mo}월", key=f"mo_dis_{m}", disabled=True, use_container_width=True)
 
-sel     = st.session_state.sel_mo
-sel_idx = months_sorted.index(sel)
-prev    = months_sorted[sel_idx-1] if sel_idx > 0 else None
-sel_df  = result_df[result_df["기준월"] == sel]
-prev_df = result_df[result_df["기준월"] == prev] if prev else pd.DataFrame()
+    st.markdown('<div style="margin-top:.6rem"></div>', unsafe_allow_html=True)
 
-sel_total  = int(sel_df["지체보상금"].sum())
-sel_n      = int((sel_df["지체보상금"] > 0).sum())
-sel_cu     = sel_df[sel_df["지체보상금"] > 0]["판매처코드"].nunique()
-prev_total = int(prev_df["지체보상금"].sum()) if not prev_df.empty else 0
+    sel = st.session_state.sel_mo
+    sel_idx = months_sorted.index(sel)
+    prev = months_sorted[sel_idx-1] if sel_idx > 0 else None
+    sel_df  = result_df[result_df["기준월"] == sel]
+    prev_df = result_df[result_df["기준월"] == prev] if prev else pd.DataFrame()
 
-_sel_yr = sel.split("-")[0]
-ann_total = int(result_df[result_df["기준월"].str.startswith(_sel_yr)]["지체보상금"].sum())
-prev_n    = int((prev_df["지체보상금"] > 0).sum()) if not prev_df.empty else 0
-prev_cu   = prev_df[prev_df["지체보상금"] > 0]["판매처코드"].nunique() if not prev_df.empty else 0
+    sel_total  = int(sel_df["지체보상금"].sum())
+    sel_n      = int((sel_df["지체보상금"] > 0).sum())
+    sel_cu     = sel_df[sel_df["지체보상금"] > 0]["판매처코드"].nunique()
+    prev_total = int(prev_df["지체보상금"].sum()) if not prev_df.empty else 0
+    prev_n     = int((prev_df["지체보상금"] > 0).sum()) if not prev_df.empty else 0
+    prev_cu    = prev_df[prev_df["지체보상금"] > 0]["판매처코드"].nunique() if not prev_df.empty else 0
+    _sel_yr    = sel.split("-")[0]
+    ann_sel    = int(result_df[result_df["기준월"].str.startswith(_sel_yr)]["지체보상금"].sum())
 
-def _delta(cur, prv, unit="원"):
-    if prv == 0: return '<span style="color:#bbb">— 전월 비교 없음</span>'
-    d = cur - prv
-    if d == 0: return '<span style="color:#bbb">± 0 전월 동일</span>'
-    arr = "▲" if d > 0 else "▼"
-    cls = "kpi-up" if d > 0 else "kpi-dn"
-    val = fmt_won(abs(d)) if unit == "원" else f"{abs(d)}{unit}"
-    return f'<span class="{cls}">{arr} {val} 전월비</span>'
+    def _delta_html(cur, prv, unit="원"):
+        if prv == 0: return '<span style="color:#94a3b8">— 전월 없음</span>'
+        d = cur - prv
+        if d == 0: return '<span style="color:#94a3b8">± 0 전월 동일</span>'
+        arr = "▲" if d > 0 else "▼"
+        cls = "kpi-up" if d > 0 else "kpi-dn"
+        val = fmt_won(abs(d)) if unit == "원" else f"{abs(d)}{unit}"
+        return f'<span class="{cls}">{arr} {val} vs 전월</span>'
 
-# 전월비 숫자 추출용
-d_amt  = sel_total - prev_total
-d_unit = "원"
-d_arrow = "▲" if d_amt > 0 else ("▼" if d_amt < 0 else "")
-d_cls   = "kpi-up" if d_amt > 0 else ("kpi-dn" if d_amt < 0 else "")
-d_txt   = f'<span class="{d_cls}">{d_arrow} {fmt_won(abs(d_amt))}</span>' if d_amt != 0 and prev_total > 0 else '<span style="color:#bbb">— 전월 비교 없음</span>'
+    d_amt = sel_total - prev_total
+    d_html = (f'<span class="{"kpi-up" if d_amt>0 else "kpi-dn"}">{"▲" if d_amt>0 else "▼"} {fmt_won(abs(d_amt))} vs 전월</span>'
+              if d_amt != 0 and prev_total > 0 else '<span style="color:#94a3b8">— 전월 없음</span>')
 
-st.markdown(f"""
-<div class="kpi-wrap">
-  <div class="kpi-card c-orange">
-    <div class="kpi-lbl">{mo_label(sel)} 지체보상금
-      <span class="kpi-tip" data-tip="선택한 기준월의 지체보상금 청구 합계액">?</span>
+    # ── 월 KPI ──────────────────────────────────────────────
+    st.markdown(f"""
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-lbl">{mo_label(sel)} 지체보상금</div>
+        <div class="kpi-val">{fmt_won(sel_total, short=True)}</div>
+        <div class="kpi-sub">{d_html}</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-lbl">청구 건수</div>
+        <div class="kpi-val">{sel_n}<span class="kpi-unit">건</span></div>
+        <div class="kpi-sub">{_delta_html(sel_n, prev_n, "건")}</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-lbl">청구 거래처</div>
+        <div class="kpi-val">{sel_cu}<span class="kpi-unit">개</span></div>
+        <div class="kpi-sub">{_delta_html(sel_cu, prev_cu, "개")}</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-lbl">{_sel_yr}년 누계</div>
+        <div class="kpi-val">{fmt_won(ann_sel, short=True)}</div>
+        <div class="kpi-sub">{_sel_yr}년 1월 ~ {mo_label(sel)}</div>
+      </div>
     </div>
-    <div class="kpi-num">{fmt_won(sel_total,short=True)}</div>
-    <div class="kpi-delta">{d_txt}</div>
-  </div>
-  <div class="kpi-card c-red">
-    <div class="kpi-lbl">청구 건수
-      <span class="kpi-tip" data-tip="지체보상금이 발생한 데이터 행 수">?</span>
-    </div>
-    <div class="kpi-num">{sel_n}<span class="kpi-unit">건</span></div>
-    <div class="kpi-delta">{_delta(sel_n, prev_n, '건')}</div>
-  </div>
-  <div class="kpi-card c-blue">
-    <div class="kpi-lbl">청구 거래처
-      <span class="kpi-tip" data-tip="지체보상금이 발생한 고유 거래처 수">?</span>
-    </div>
-    <div class="kpi-num">{sel_cu}<span class="kpi-unit">개</span></div>
-    <div class="kpi-delta">{_delta(sel_cu, prev_cu, '개')}</div>
-  </div>
-  <div class="kpi-card c-gray">
-    <div class="kpi-lbl">{_sel_yr}년 누계 지체보상금
-      <span class="kpi-tip" data-tip="{_sel_yr}년 1월부터 {mo_label(sel)}까지 합계">?</span>
-    </div>
-    <div class="kpi-num">{fmt_won(ann_total,short=True)}</div>
-    <div class="kpi-delta" style="color:#888">{_sel_yr}년 1월 ~ {mo_label(sel)}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# ── 신규연체 / 추가연체 / 수금완료 ────────────────────────────
-_yr2, _mo2 = int(sel.split("-")[0]), int(sel.split("-")[1])
-_prev_mo = f"{_yr2-1}-12" if _mo2 == 1 else f"{_yr2}-{_mo2-1:02d}"
-_prev_df = result_df[result_df["기준월"] == _prev_mo]
-_prev_map = {r["판매처코드"]: r for _, r in _prev_df.iterrows()}
-_curr_map = {r["판매처코드"]: r for _, r in sel_df.iterrows()}
+    # ── 신규/추가/수금 카드 ───────────────────────────────────
+    _prev_map = {r["판매처코드"]: r for _, r in prev_df.iterrows()}
+    _curr_map = {r["판매처코드"]: r for _, r in sel_df.iterrows()}
+    _신규, _추가, _수금 = [], [], []
+    for _code in set(_prev_map) | set(_curr_map):
+        _c = _curr_map.get(_code); _p = _prev_map.get(_code)
+        _cj = int(_c["지체보상금"]) if _c is not None else 0
+        _pj = int(_p["지체보상금"]) if _p is not None else 0
+        _cp = int(_c["현 미수금"])   if _c is not None else 0
+        _pp = int(_p["현 미수금"])   if _p is not None else 0
+        _nm = (_c if _c is not None else _p)["판매처명"]
+        if _cj > 0 and _pj == 0:   _신규.append({"명칭": _nm, "금액": _cj})
+        elif _cj > 0 and _pj > 0:  _추가.append({"명칭": _nm, "금액": _cj})
+        if _pj > 0 and _cj == 0:   _수금.append({"명칭": _nm, "금액": max(_pp - _cp, 0) or _pp})
+    for _lst in (_신규, _추가, _수금): _lst.sort(key=lambda x: -x["금액"])
 
-_신규, _추가, _수금 = [], [], []
-for _code in set(_prev_map) | set(_curr_map):
-    _c = _curr_map.get(_code)
-    _p = _prev_map.get(_code)
-    _cj = int(_c["지체보상금"]) if _c is not None else 0
-    _pj = int(_p["지체보상금"]) if _p is not None else 0
-    _cp = int(_c["현 미수금"]) if _c is not None else 0
-    _pp = int(_p["현 미수금"]) if _p is not None else 0
-    _nm = (_c if _c is not None else _p)["판매처명"]
-    if _cj > 0 and _pj == 0:
-        _신규.append({"명칭": _nm, "금액": _cj})
-    elif _cj > 0 and _pj > 0:
-        _추가.append({"명칭": _nm, "금액": _cj})
-    if _pj > 0 and _cj == 0:
-        _수금.append({"명칭": _nm, "금액": max(_pp - _cp, 0) or _pp})
+    def _chg_html(lst, cls, title, amt_color):
+        rows = ""
+        for i, x in enumerate(lst[:5]):
+            rows += (f'<div class="chg-row">'
+                     f'<span style="font-size:.7rem;color:#cbd5e1;width:1rem;flex-shrink:0">{i+1}</span>'
+                     f'<span class="chg-name">{x["명칭"]}</span>'
+                     f'<span class="chg-amt" style="color:{amt_color}">{fmt_won(x["금액"], short=True)}</span>'
+                     f'</div>')
+        if not lst:
+            rows = '<div style="color:#94a3b8;font-size:.82rem;padding:1.4rem 0;text-align:center">해당 없음</div>'
+        total = sum(x["금액"] for x in lst)
+        badge = f'<span style="font-size:.73rem;color:#64748b;font-weight:400"> {len(lst)}건 · 합계 {fmt_won(total,short=True)}</span>'
+        return (f'<div class="chg-card {cls}">'
+                f'<div class="chg-title" style="color:{amt_color}">{title}{badge}</div>'
+                f'{rows}</div>')
 
-for _lst in (_신규, _추가, _수금):
-    _lst.sort(key=lambda x: -x["금액"])
+    cc1, cc2, cc3 = st.columns(3, gap="medium")
+    with cc1: st.markdown(_chg_html(_신규, "red",   f"{mo_label(sel)} 신규 연체", "#ef4444"), unsafe_allow_html=True)
+    with cc2: st.markdown(_chg_html(_추가, "amber", f"{mo_label(sel)} 추가 연체", "#d97706"), unsafe_allow_html=True)
+    with cc3: st.markdown(_chg_html(_수금, "green", f"{mo_label(sel)} 수금 완료", "#059669"), unsafe_allow_html=True)
 
-def _cmp_card(title, lst, accent, sign, amt_color, min_h="auto"):
-    total = sum(x["금액"] for x in lst)
-    rows = ""
-    for i, x in enumerate(lst[:5]):
-        rows += (
-            f'<div style="display:flex;justify-content:space-between;align-items:center;'
-            f'padding:.42rem 0;border-bottom:1px solid #f2f2f2">'
-            f'<div style="display:flex;align-items:center;gap:.5rem;min-width:0;flex:1">'
-            f'<span style="font-size:.68rem;color:#ccc;width:.8rem;flex-shrink:0">{i+1}</span>'
-            f'<span style="font-size:.83rem;color:#2d2d2d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{x["명칭"]}</span>'
-            f'</div>'
-            f'<span style="font-size:.84rem;font-weight:700;color:{amt_color};white-space:nowrap;margin-left:.5rem">'
-            f'{sign}{fmt_won(x["금액"],short=True)}</span>'
-            f'</div>'
+    st.markdown('<div style="margin:.8rem 0"></div>', unsafe_allow_html=True)
+
+    # ── 청구 거래처 랭킹 + 차트 ──────────────────────────────
+    left_col, right_col = st.columns([5, 5], gap="large")
+
+    with left_col:
+        st.markdown('<div class="sec-hd"><span class="sec-bar"></span>청구 거래처 랭킹</div>', unsafe_allow_html=True)
+        charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
+        all_max = int(charge["지체보상금"].max()) if not charge.empty else 1
+        rank_colors = ["#ef4444","#f97316","#f59e0b","#84cc16","#22c55e",
+                       "#14b8a6","#3b82f6","#6366f1","#8b5cf6","#ec4899"]
+        if charge.empty:
+            st.markdown('<div style="text-align:center;color:#94a3b8;padding:3rem 0;font-size:.88rem">해당 월 청구 발생 없음</div>', unsafe_allow_html=True)
+        else:
+            items_html = ""
+            for i, row in charge.iterrows():
+                v = int(row["지체보상금"])
+                pct = min(v / all_max * 100, 100)
+                color = rank_colors[i] if i < len(rank_colors) else "#94a3b8"
+                org = str(row.get("사무소","")).strip()
+                if not org or org in ("nan",""):
+                    org = str(row.get("사업부","")).strip()
+                org_badge = (f'<span class="badge badge-gray">{org}</span>') if org and org not in ("nan","") else ""
+                items_html += f"""
+                <div class="rank-item">
+                  <span class="rank-badge" style="background:{color}">{i+1}</span>
+                  <div>
+                    <div style="font-size:.84rem;font-weight:600;color:#1e293b">{row["판매처명"]}{org_badge}</div>
+                    <div class="rank-bar-bg"><div class="rank-bar-fg" style="background:{color};width:{pct:.1f}%"></div></div>
+                  </div>
+                  <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v, short=True)}</div>
+                </div>"""
+            st.markdown(f'<div style="padding:.1rem 0">{items_html}</div>', unsafe_allow_html=True)
+
+    with right_col:
+        st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{_sel_yr}년 월별 추이</div>', unsafe_allow_html=True)
+        all_12 = [f"{_sel_yr}-{mo:02d}" for mo in range(1, 13)]
+        x_12 = [f"{int(m.split('-')[1])}월" for m in all_12]
+        y_12 = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]
+        bar_col_12 = ["#3b82f6" if m == sel else ("#dbeafe" if mo_sum.get(m, 0) > 0 else "#f1f5f9") for m in all_12]
+        cum_12 = []
+        run = 0
+        for v in y_12:
+            run += v
+            cum_12.append(round(run, 1))
+        last_data_idx = max((i for i, v in enumerate(y_12) if v > 0), default=-1)
+        cum_line_12 = [cum_12[i] if i <= last_data_idx else None for i in range(12)]
+
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=x_12, y=cum_line_12, name="_fill",
+            mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
+            fill="tozeroy", fillcolor="rgba(245,158,11,0.08)",
+            hoverinfo="skip", yaxis="y2", showlegend=False,
+        ))
+        fig2.add_trace(go.Bar(
+            x=x_12, y=y_12, name="월별",
+            marker_color=bar_col_12, marker_line_width=0,
+            text=[f"{v:,.0f}만" if v > 0 else "" for v in y_12],
+            textposition="outside", cliponaxis=False,
+            textfont=dict(size=10, color="#64748b"),
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f}만원<extra></extra>",
+            yaxis="y1",
+        ))
+        fig2.add_trace(go.Scatter(
+            x=x_12, y=cum_line_12, name="누적",
+            mode="lines+markers",
+            line=dict(color="#f59e0b", width=2.5),
+            marker=dict(size=6, color="#f59e0b", line=dict(color="#fff", width=2)),
+            hovertemplate="<b>%{x}</b><br>누적 %{y:,.0f}만원<extra></extra>",
+            yaxis="y2",
+        ))
+        mo_max2 = max(y_12) if max(y_12) > 0 else 1
+        cu_max2 = max(v for v in cum_12 if v > 0) if any(v > 0 for v in cum_12) else 1
+        fig2.update_layout(
+            plot_bgcolor="white", paper_bgcolor="white",
+            margin=dict(t=20, b=10, l=50, r=60), height=360,
+            bargap=0.4,
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=1.06,
+                        font=dict(size=11, family=FONT), bgcolor="rgba(0,0,0,0)"),
+            yaxis=dict(gridcolor="#f1f5f9", tickformat=",d", zeroline=False,
+                       range=[0, mo_max2 * 1.6], tickfont=dict(size=10), title=None, showline=False),
+            yaxis2=dict(overlaying="y", side="right", range=[0, cu_max2 * 1.3],
+                        tickformat=",d", tickfont=dict(size=10),
+                        showgrid=False, title=None, showline=False),
+            xaxis=dict(showgrid=False, tickfont=dict(size=11), showline=False),
+            font=dict(family=FONT),
         )
-    if len(lst) > 5:
-        etc = lst[5:]; etc_tot = sum(e["금액"] for e in etc)
-        rows += f'<div style="font-size:.72rem;color:#bbb;padding:.4rem 0 0">그 외 소액 {len(etc)}처 ({fmt_won(etc_tot,short=True)})</div>'
-    if not lst:
-        rows = '<div style="color:#ccc;font-size:.82rem;padding:1.8rem 0;text-align:center">해당 없음</div>'
-    return (
-        f'<div style="background:#fff;border-radius:10px;border-top:3px solid {accent};'
-        f'box-shadow:0 1px 8px rgba(0,0,0,.07);padding:1rem 1.15rem 1.1rem;min-height:{min_h}">'
-        f'<div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:.65rem">'
-        f'<span style="font-size:.88rem;font-weight:800;color:{accent}">{title}</span>'
-        f'<span style="font-size:.76rem;color:#aaa">{len(lst)}건 &nbsp;·&nbsp; 총 <b style="color:#555">{fmt_won(total,short=True)}</b></span>'
-        f'</div>'
-        f'{rows}</div>'
-    )
+        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
-_max_n = max(min(len(_신규), 5), min(len(_추가), 5), min(len(_수금), 5))
-_card_min_h = f"{72 + _max_n * 44}px"
-_cc1, _cc2, _cc3 = st.columns(3, gap="medium")
-with _cc1:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 신규 연체", _신규, "#e74c3c", "+", "#c0392b", _card_min_h), unsafe_allow_html=True)
-with _cc2:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 추가 연체", _추가, "#e67e22", "+", "#c96a10", _card_min_h), unsafe_allow_html=True)
-with _cc3:
-    st.markdown(_cmp_card(f"{mo_label(sel)} 수금 완료", _수금, "#27ae60", "-", "#1a7a42", _card_min_h), unsafe_allow_html=True)
-
-st.markdown('<div style="margin-bottom:1.2rem"></div>', unsafe_allow_html=True)
-
-# ── 청구 발생 거래처 랭킹 ─────────────────────────────────────
-charge = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).reset_index(drop=True)
-all_max = result_df[result_df["지체보상금"]>0]["지체보상금"].max() if not result_df[result_df["지체보상금"]>0].empty else 1
-
-if charge.empty:
-    inner_html = '<div style="text-align:center;color:#ccc;padding:3rem 0;font-size:.9rem">해당 월 청구 발생 없음</div>'
-else:
-    rank_colors = ["#c0392b","#e74c3c","#e67e22","#d4ac0d","#2980b9","#2471a3","#1a5276","#196f3d","#1e8449","#117a65"]
-    rows_html = ""
-    for i, row in charge.iterrows():
-        v = int(row["지체보상금"])
-        pct = min(v / all_max * 100, 100)
-        color = rank_colors[i] if i < len(rank_colors) else "#888"
-        사무소 = str(row.get("사무소","")).strip()
-        사업부 = str(row.get("사업부","")).strip()
-        담당자 = str(row.get("담당자","")).strip()
-        org = 사무소 if 사무소 and 사무소 not in ("nan","") else (사업부 if 사업부 and 사업부 not in ("nan","") else "")
-        org_badge = (
-            f'<span style="background:#f0f2f5;color:#666;font-size:.7rem;'
-            f'padding:.1rem .45rem;border-radius:3px;margin-left:.4rem">{org}</span>'
-        ) if org else ""
-        mgr_txt = (
-            f'<span style="font-size:.72rem;color:#aaa;margin-left:.3rem">· {담당자}</span>'
-        ) if 담당자 and 담당자 not in ("nan","") else ""
-        rank_badge = (
-            f'<span style="background:{color};color:#fff;font-size:.72rem;font-weight:800;'
-            f'width:1.4rem;height:1.4rem;border-radius:50%;display:inline-flex;'
-            f'align-items:center;justify-content:center;flex-shrink:0">{i+1}</span>'
-        )
-        rows_html += f"""
-        <div style="display:grid;grid-template-columns:2rem 1fr 5rem;align-items:center;
-                    gap:.8rem;padding:.55rem 0;border-bottom:1px solid #f0f2f5">
-          {rank_badge}
-          <div>
-            <div style="font-size:.85rem;font-weight:600;color:#1a1a1a;margin-bottom:.25rem">
-              {row['판매처명']}{org_badge}{mgr_txt}
-            </div>
-            <div style="background:#eef0f4;border-radius:4px;height:7px;overflow:hidden">
-              <div style="background:{color};width:{pct:.1f}%;height:100%;border-radius:4px"></div>
-            </div>
-          </div>
-          <div style="text-align:right;font-size:.88rem;font-weight:700;color:{color}">{fmt_won(v,short=True)}</div>
-        </div>"""
-    inner_html = f'<div style="padding:.2rem 0">{rows_html}</div>'
-
-st.markdown(
-    f'<div style="background:#ffffff;border-radius:10px;border:1px solid #e0e5ef;'
-    f'box-shadow:0 1px 6px rgba(0,0,0,.07);padding:1rem 1.4rem 1.2rem;margin-bottom:1rem">'
-    f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 청구 발생 거래처</div>'
-    f'{inner_html}</div>',
-    unsafe_allow_html=True
-)
-
-# ── 월별 + 누적 콤보 차트 (전체 너비) ────────────────────────
-sel_yr_str = st.session_state.get("sel_yr", sel.split("-")[0])
-all_12 = [f"{sel_yr_str}-{mo:02d}" for mo in range(1, 13)]
-x_labels = [f"{int(m.split('-')[1])}월" for m in all_12]
-bar_vals = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]
-cum_vals = []
-run = 0
-for v in bar_vals:
-    run += v
-    cum_vals.append(round(run, 1))
-bar_colors = ["#e8604c" if m == sel else "#f2a99a" for m in all_12]
-all_mo_max = max(bar_vals) if max(bar_vals) > 0 else 1
-cum_max = max(cum_vals) if max(cum_vals) > 0 else 1
-last_data_idx = max((i for i, v in enumerate(bar_vals) if v > 0), default=-1)
-cum_line = [cum_vals[i] if i <= last_data_idx else None for i in range(12)]
-cum_pts  = [cum_vals[i] if i <= last_data_idx and cum_vals[i] > 0 else None for i in range(12)]
-
-st.markdown(
-    f'<div style="background:#ffffff;border-radius:10px;border:1px solid #e0e5ef;'
-    f'box-shadow:0 1px 6px rgba(0,0,0,.07);padding:.85rem 1.4rem .2rem;margin-bottom:.3rem">'
-    f'<div style="font-weight:800;font-size:.9rem;color:#1a2535;margin-bottom:.15rem">'
-    f'{sel_yr_str}년 월별 · 누적 지체보상금</div>'
-    f'<div style="font-size:.7rem;color:#aaa">단위: 만원 &nbsp;|&nbsp; '
-    f'<span style="color:#f2a99a">■</span> 월별 발생 &nbsp;'
-    f'<span style="color:#e67e22">─●</span> 누적</div></div>',
-    unsafe_allow_html=True
-)
-fig_combo = go.Figure()
-# 누적 면적 (뒤에 깔리게 먼저)
-fig_combo.add_trace(go.Scatter(
-    x=x_labels, y=cum_line, name="_fill",
-    mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
-    fill="tozeroy", fillcolor="rgba(232,146,74,0.10)",
-    hoverinfo="skip", yaxis="y2", showlegend=False,
-))
-# 바: 월별
-fig_combo.add_trace(go.Bar(
-    x=x_labels, y=bar_vals, name="월별 발생",
-    marker_color=bar_colors, marker_line_width=0,
-    text=[f"{v:,.0f}만" if v > 0 else "" for v in bar_vals],
-    textposition="outside", cliponaxis=False,
-    textfont=dict(size=10, color="#888"),
-    hovertemplate="<b>%{x}</b> 월별 %{y:,.0f}만원<extra></extra>",
-    yaxis="y1",
-))
-# 누적 라인+점+라벨
-fig_combo.add_trace(go.Scatter(
-    x=x_labels, y=cum_line, name="누적 지체보상금",
-    mode="lines+markers+text",
-    line=dict(color="#e8924a", width=2.5),
-    marker=dict(size=7, color="#e8924a", line=dict(color="#fff", width=2)),
-    text=[f"{v:,.0f}만" if v else "" for v in cum_pts],
-    textposition="top center",
-    textfont=dict(size=10, color="#c07030"),
-    hovertemplate="<b>%{x}</b> 누적 %{y:,.0f}만원<extra></extra>",
-    yaxis="y2",
-))
-fig_combo.update_layout(
-    plot_bgcolor="white", paper_bgcolor="white",
-    margin=dict(t=45, b=10, l=55, r=65),
-    height=350,
-    bargap=0.4,
-    legend=dict(
-        orientation="h", x=0.5, xanchor="center", y=1.07,
-        font=dict(size=11, family=FONT),
-        bgcolor="rgba(0,0,0,0)",
-    ),
-    yaxis=dict(gridcolor="#f0f2f6", tickformat=",d", zeroline=False,
-               range=[0, all_mo_max * 1.55], tickfont=dict(size=10),
-               title=None, showline=False),
-    yaxis2=dict(overlaying="y", side="right", range=[0, cum_max * 1.3],
-                tickformat=",d", tickfont=dict(size=10),
-                showgrid=False, title=None, showline=False),
-    xaxis=dict(showgrid=False, tickfont=dict(size=11), showline=False, zeroline=False),
-    font=dict(family=FONT),
-)
-st.plotly_chart(fig_combo, use_container_width=True, config={"displayModeBar": False})
-
-# ── 다운로드 버튼 ────────────────────────────────────────────
-charge_only = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
-n_charge = len(charge_only)
-
-dc1, dc2, dc3, dc4 = st.columns(4)
-with dc1:
-    st.download_button(
-        f"⬇ {mo_label(sel)} 발생현황 엑셀",
-        data=make_excel(charge_only, f"{mo_label(sel)}"),
-        file_name=f"지체보상금_{sel.replace('-','')}_발생현황.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True, key="btn_dl_mo_excel",
-    )
-with dc2:
-    st.download_button(
-        "⬇ 전체 기간 엑셀",
-        data=make_full_excel(result_df),
-        file_name=f"지체보상금_전체_{date.today():%Y%m%d}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True, key="btn_dl_full_excel",
-    )
-with dc3:
-    st.download_button(
-        f"📄 {mo_label(sel)} 공문 Word ({n_charge}건)" if n_charge else "📄 공문 없음 (청구 0건)",
-        data=make_공문_zip(charge_only, mo_label(sel)) if n_charge else b"",
-        file_name=f"지체보상금_공문_{sel.replace('-','')}.zip",
-        mime="application/zip",
-        disabled=(n_charge == 0),
-        use_container_width=True, key="btn_dl_mo_docx",
-    )
-with dc4:
+    # ── 다운로드 버튼 ────────────────────────────────────────
+    charge_only = sel_df[sel_df["지체보상금"] > 0].sort_values("지체보상금", ascending=False)
+    n_charge = len(charge_only)
     all_charge_df = result_df[result_df["지체보상금"] > 0]
     n_vendors = all_charge_df["판매처코드"].nunique()
-    st.download_button(
-        f"📁 거래처별 전체기간 공문 ({n_vendors}개사)",
-        data=make_공문_zip_cumulative(result_df) if n_vendors else b"",
-        file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
-        mime="application/zip",
-        disabled=(n_vendors == 0),
-        use_container_width=True, key="btn_dl_all_docx",
-        help="25년 전체 기간 거래처별 누계 공문 Word ZIP",
-    )
 
-# ── 상세 탭 ──────────────────────────────────────────────────
-tab1, tab2 = st.tabs([f"📋 {mo_label(sel)} 상세 내역", "📊 거래처별 누계 (전 기간)"])
+    st.markdown('<div class="sec-hd"><span class="sec-bar"></span>다운로드</div>', unsafe_allow_html=True)
+    dc1, dc2, dc3, dc4 = st.columns(4)
+    with dc1:
+        st.download_button(
+            f"⬇ {mo_label(sel)} 발생현황 엑셀",
+            data=make_excel(charge_only, f"{mo_label(sel)}"),
+            file_name=f"지체보상금_{sel.replace('-','')}_발생현황.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True, key="btn_dl_mo_excel",
+        )
+    with dc2:
+        st.download_button(
+            "⬇ 전체 기간 엑셀",
+            data=make_full_excel(result_df),
+            file_name=f"지체보상금_전체_{date.today():%Y%m%d}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True, key="btn_dl_full_excel",
+        )
+    with dc3:
+        st.download_button(
+            f"📄 {mo_label(sel)} 공문 ({n_charge}건)" if n_charge else "📄 공문 없음",
+            data=make_공문_zip(charge_only, mo_label(sel)) if n_charge else b"",
+            file_name=f"지체보상금_공문_{sel.replace('-','')}.zip",
+            mime="application/zip",
+            disabled=(n_charge == 0),
+            use_container_width=True, key="btn_dl_mo_docx",
+        )
+    with dc4:
+        st.download_button(
+            f"📁 거래처별 전체기간 공문 ({n_vendors}개사)",
+            data=make_공문_zip_cumulative(result_df) if n_vendors else b"",
+            file_name=f"지체보상금_공문_전체기간_{date.today():%Y%m%d}.zip",
+            mime="application/zip",
+            disabled=(n_vendors == 0),
+            use_container_width=True, key="btn_dl_all_docx",
+        )
 
-with tab1:
-    fc1, fc2 = st.columns([4, 1])
-    kw     = fc1.text_input("거래처명 검색", placeholder="거래처명 검색",
+    # ── 상세 테이블 ──────────────────────────────────────────
+    st.markdown(f'<div class="sec-hd"><span class="sec-bar"></span>{mo_label(sel)} 상세 내역</div>', unsafe_allow_html=True)
+
+    fc1, fc2 = st.columns([5, 1])
+    kw     = fc1.text_input("거래처명 검색", placeholder="거래처명으로 검색",
                             label_visibility="collapsed", key="kw1")
     only_c = fc2.checkbox("청구만", key="oc1")
     view   = sel_df.copy()
@@ -1431,116 +1287,68 @@ with tab1:
 
     def _calc_str(r):
         if r["청구 증분일수"] <= 0: return "—"
-        return (f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]}'
-                f' = {int(r["지체보상금"]):,}원')
+        return f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    _all_cols = [
-        "판매처코드", "판매처명", "사업자번호", "계약유형", "채널",
-        "사업부", "사무소", "담당자",
-        "현 미수금",
-        "유효기준회전일", "현 회전일", "지연일수(누적)", "청구 증분일수",
-        "요율", "지체보상금", "계산 근거", "비고",
-    ]
+    _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","채널",
+                 "사업부","사무소","담당자","현 미수금",
+                 "유효기준회전일","현 회전일","지연일수(누적)","청구 증분일수",
+                 "요율","지체보상금","계산 근거","비고"]
     disp = view[[c for c in _all_cols if c in view.columns]]
     disp = disp.rename(columns={"판매처코드": "거래처코드", "채널": "거래채널"})
+    disp.index = disp.index + 1
 
     def _sty(r):
-        if r["지체보상금"] > 0: return ["background:#fff8f0;font-weight:bold"] * len(r)
-        return ["color:#ccc"] * len(r)
+        if r["지체보상금"] > 0: return ["background:#fffbeb;font-weight:bold"] * len(r)
+        return ["color:#cbd5e1"] * len(r)
 
-    disp = disp.reset_index(drop=True)
-    disp.index = disp.index + 1
     t1_event = st.dataframe(
         disp.style.apply(_sty, axis=1)
             .format({"현 미수금": "{:,.0f}", "지체보상금": "{:,.0f}"}),
-        use_container_width=True, height=430,
+        use_container_width=True, height=440,
         on_select="rerun", selection_mode="multi-row", key="tab1_df",
         column_config={
-            "거래처코드":    st.column_config.TextColumn("거래처코드",   width=115),
-            "판매처명":      st.column_config.TextColumn("거래처명",     width=210),
-            "사업자번호":    st.column_config.TextColumn("사업자번호",   width=115),
-            "계약유형":      st.column_config.TextColumn("계약유형",     width=110),
-            "거래채널":      st.column_config.TextColumn("거래채널",     width=80),
-            "사업부":        st.column_config.TextColumn("사업부",       width=150),
-            "사무소":        st.column_config.TextColumn("사무소",       width=140),
-            "담당자":        st.column_config.TextColumn("담당자",       width=80),
-            "현 미수금":     st.column_config.NumberColumn("현 미수금",  width=120, format="%,.0f"),
-            "유효기준회전일":st.column_config.NumberColumn("기준회전일", width=80),
-            "현 회전일":     st.column_config.NumberColumn("현회전일",   width=75),
-            "지연일수(누적)":st.column_config.NumberColumn("지연일수",   width=75),
-            "청구 증분일수": st.column_config.NumberColumn("청구일수",   width=75),
-            "요율":          st.column_config.TextColumn("요율",         width=65),
-            "지체보상금":    st.column_config.NumberColumn("지체보상금", width=120, format="%,.0f"),
-            "계산 근거":     st.column_config.TextColumn("계산 근거",    width=280),
-            "비고":          st.column_config.TextColumn("비고",         width=80),
+            "거래처코드":     st.column_config.TextColumn("거래처코드",   width=115),
+            "판매처명":       st.column_config.TextColumn("거래처명",     width=210),
+            "사업자번호":     st.column_config.TextColumn("사업자번호",   width=115),
+            "계약유형":       st.column_config.TextColumn("계약유형",     width=110),
+            "거래채널":       st.column_config.TextColumn("채널",         width=75),
+            "사업부":         st.column_config.TextColumn("사업부",       width=145),
+            "사무소":         st.column_config.TextColumn("사무소",       width=130),
+            "담당자":         st.column_config.TextColumn("담당자",       width=80),
+            "현 미수금":      st.column_config.NumberColumn("현 미수금",  width=120, format="%,.0f"),
+            "유효기준회전일": st.column_config.NumberColumn("기준회전일", width=80),
+            "현 회전일":      st.column_config.NumberColumn("현회전일",   width=75),
+            "지연일수(누적)": st.column_config.NumberColumn("지연일수",   width=75),
+            "청구 증분일수":  st.column_config.NumberColumn("청구일수",   width=75),
+            "요율":           st.column_config.TextColumn("요율",         width=65),
+            "지체보상금":     st.column_config.NumberColumn("지체보상금", width=125, format="%,.0f"),
+            "계산 근거":      st.column_config.TextColumn("계산 근거",    width=280),
+            "비고":           st.column_config.TextColumn("비고",         width=75),
         },
     )
+
     _sel_pos = t1_event.selection.rows if t1_event.selection.rows else []
     if _sel_pos:
         _sel_codes = [view.iloc[i]["판매처코드"] for i in _sel_pos if i < len(view)]
         _sel_mo_df  = view[view["판매처코드"].isin(_sel_codes) & (view["지체보상금"] > 0)]
         _sel_all_df = result_df[result_df["판매처코드"].isin(_sel_codes) & (result_df["지체보상금"] > 0)]
-        n_mo  = len(_sel_mo_df)
-        n_all = _sel_all_df["판매처코드"].nunique()
-        st.markdown(f'<div style="font-size:.75rem;color:#888;margin:.4rem 0 .3rem">'
-                    f'선택된 거래처: <b style="color:#1a2535">{len(_sel_pos)}개사</b>'
-                    f'&nbsp;·&nbsp;이번달 청구 {n_mo}건&nbsp;·&nbsp;전체기간 청구처 {n_all}개사</div>',
+        n_mo = len(_sel_mo_df); n_all = _sel_all_df["판매처코드"].nunique()
+        st.markdown(f'<div style="font-size:.75rem;color:#64748b;margin:.4rem 0 .3rem">'
+                    f'선택: <b style="color:#0f172a">{len(_sel_pos)}개사</b> · 이번달 청구 {n_mo}건 · 전체기간 {n_all}개사</div>',
                     unsafe_allow_html=True)
         _ba, _bb, _bc = st.columns([2, 2, 4])
         with _ba:
-            st.download_button(
-                f"📄 선택 이번달 공문 ({n_mo}건)",
+            st.download_button(f"📄 선택 이번달 공문 ({n_mo}건)",
                 data=make_공문_zip(_sel_mo_df, mo_label(sel)) if n_mo else b"",
-                file_name=f"지체보상금_선택공문_{sel.replace('-','')}.zip",
-                mime="application/zip", disabled=(n_mo == 0), use_container_width=True,
-                key="btn_sel_mo_docx",
-            )
+                file_name=f"지체보상금_선택_{sel.replace('-','')}.zip",
+                mime="application/zip", disabled=(n_mo == 0),
+                use_container_width=True, key="btn_sel_mo_docx")
         with _bb:
-            st.download_button(
-                f"📁 선택 전체기간 공문 ({n_all}개사)",
+            st.download_button(f"📁 선택 전체기간 공문 ({n_all}개사)",
                 data=make_공문_zip_cumulative(_sel_all_df) if n_all else b"",
-                file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
-                mime="application/zip", disabled=(n_all == 0), use_container_width=True,
-                key="btn_sel_cum_t1",
-            )
+                file_name=f"지체보상금_선택_전체기간_{date.today():%Y%m%d}.zip",
+                mime="application/zip", disabled=(n_all == 0),
+                use_container_width=True, key="btn_sel_cum_t1")
     else:
         st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
-
-with tab2:
-    pv = result_df.pivot_table(
-        index=["판매처코드","판매처명"], columns="기준월",
-        values="지체보상금", aggfunc="sum", fill_value=0
-    ).reset_index()
-    pv.columns = [mo_label(c) if c not in ["판매처코드","판매처명"] else c for c in pv.columns]
-    pv["합계"] = pv.iloc[:, 2:].sum(axis=1)
-    pv = pv.sort_values("합계", ascending=False).reset_index(drop=True)
-    pv.index = pv.index + 1
-    nc = [c for c in pv.columns if c not in ["판매처코드","판매처명"]]
-    def _heat(s):
-        mx = s.max() if s.max() else 1
-        return [f"background-color: rgba(255,100,50,{v/mx*0.6:.2f})" for v in s]
-    t2_event = st.dataframe(
-        pv.style.format({c: "{:,.0f}" for c in nc}).apply(_heat, subset=["합계"]),
-        use_container_width=True, height=430,
-        on_select="rerun", selection_mode="multi-row", key="tab2_df",
-    )
-    _t2_pos = t2_event.selection.rows if t2_event.selection.rows else []
-    if _t2_pos:
-        _t2_codes = [pv.iloc[i]["판매처코드"] for i in _t2_pos if i < len(pv)]
-        _t2_df = result_df[result_df["판매처코드"].isin(_t2_codes) & (result_df["지체보상금"] > 0)]
-        n_t2 = _t2_df["판매처코드"].nunique()
-        st.markdown(f'<div style="font-size:.75rem;color:#888;margin:.4rem 0 .3rem">'
-                    f'선택된 거래처: <b style="color:#1a2535">{len(_t2_pos)}개사</b></div>',
-                    unsafe_allow_html=True)
-        _ta, _tb, _tc = st.columns([2, 2, 4])
-        with _ta:
-            st.download_button(
-                f"📁 선택 전체기간 공문 ({n_t2}개사)",
-                data=make_공문_zip_cumulative(_t2_df) if n_t2 else b"",
-                file_name=f"지체보상금_선택공문_전체기간_{date.today():%Y%m%d}.zip",
-                mime="application/zip", disabled=(n_t2 == 0), use_container_width=True,
-                key="btn_sel_cum_t2",
-            )
-    else:
-        st.caption("행을 클릭하면 선택 → 전체기간 공문 다운로드 버튼이 표시됩니다")
