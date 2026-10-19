@@ -503,6 +503,8 @@ def load_monthly(file_bytes, think_codes=None):
     if "사업부명" in df.columns: df = df[~df["사업부명"].apply(lambda x: any(k in str(x) for k in EXCLUDE_BU))]
     df = df[~df["판매처"].isin(EXCLUDE_CODES)]
     if "사무소명" in df.columns: df = df[~df["사무소명"].isin(EXCLUDE_OFFICE)]
+    # 여러 파일 합산 시 같은 거래처·채널·년월 중복 제거 (마지막 파일 값 우선)
+    df = df.drop_duplicates(subset=["년월", "판매처", "채널"], keep="last")
     months = []
     for (yr, mo), grp in df.groupby(["_yr","_mo"]):
         rows = [{"연":int(yr),"월":int(mo),"코드":str(r["판매처"]).strip(),
@@ -811,6 +813,8 @@ CT_CSV    = Path("input/계약정보/계약_매핑결과.csv")
 def _read_mo_folder(folder_str: str, _mtime: float = 0):
     folder = Path(folder_str)
     files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
+    # 기준·가공 안내 파일 제외 (월별 잔고 데이터가 아님)
+    files = [f for f in files if not any(k in f.name for k in ["기준", "가공", "~$"])]
     if not files: return None
     dfs = [pd.read_excel(f, dtype=str).dropna(how="all") for f in files]
     combined = pd.concat(dfs, ignore_index=True)
