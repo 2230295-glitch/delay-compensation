@@ -27,18 +27,19 @@ st.set_page_config(page_title="지체보상금 대시보드", layout="wide", pag
                    initial_sidebar_state="collapsed")
 
 st.markdown(
-    '<link href="https://cdn.jsdelivr.net/gh/webfontworld/naverfonts/NanumSquareNeo.css" rel="stylesheet">',
+    '<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">',
     unsafe_allow_html=True,
 )
 
 st.markdown("""<style>
 html, body, [class*="css"], .stApp, button, input, select, textarea,
-[data-testid], [data-baseweb], .stMarkdown, .stDataFrame, p, span, div, th, td {
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
+[data-testid], [data-baseweb], .stMarkdown, .stDataFrame, p, span, div, th, td, label {
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif !important;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── 레이아웃 ── */
-.stApp { background: #f0f2f7; }
+.stApp { background: #F5F5F5; }
 header[data-testid="stHeader"] { background: transparent !important; height: 0 !important; min-height: 0 !important; }
 [data-testid="stToolbar"] { display: none !important; }
 [data-testid="stDecoration"] { display: none !important; }
@@ -51,146 +52,191 @@ section[data-testid="stSidebar"] { display: none !important; }
   padding-top: 0 !important;
 }
 
-/* ── 헤더 ── */
+/* ── 헤더 (레퍼런스: 흰 배경, 검정 타이틀) ── */
 .top-header {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
-  padding: 1.1rem 1.8rem; margin: 0 -1.8rem 1.4rem;
+  background: #FFFFFF;
+  padding: .9rem 1.8rem; margin: 0 -1.8rem 1.2rem;
   display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 3px solid #3b82f6;
+  border-bottom: 1px solid #E0E0E0;
 }
-.hd-title { font-size: 1.25rem; font-weight: 900; color: #fff; letter-spacing: -.01em; }
-.hd-sub   { font-size: .72rem; color: #64a0c8; margin-top: .12rem; }
+.hd-left { display: flex; flex-direction: column; gap: .15rem; }
+.hd-title { font-size: 1.05rem; font-weight: 700; color: #212121; letter-spacing: -.02em; }
+.hd-sub   { font-size: .72rem; color: #9E9E9E; margin-top: .05rem; }
 .hd-badge {
-  background: rgba(59,130,246,.15); color: #93c5fd;
-  border: 1px solid rgba(59,130,246,.3);
-  font-size: .74rem; font-weight: 700; padding: .28rem .8rem; border-radius: 4px;
+  background: #FFF3E0; color: #E65100;
+  border: 1px solid #FFCC80;
+  font-size: .72rem; font-weight: 700; padding: .25rem .7rem; border-radius: 4px;
 }
 
 /* ── 탭 ── */
 [data-baseweb="tab-list"] {
   background: #fff !important;
-  border-radius: 8px 8px 0 0 !important;
-  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px 6px 0 0 !important;
+  border: 1px solid #E0E0E0 !important;
   border-bottom: none !important;
   padding: 0 .5rem !important;
   gap: 0 !important;
 }
 [data-baseweb="tab"] {
-  font-weight: 700 !important; font-size: .88rem !important;
-  padding: .7rem 1.4rem !important; color: #94a3b8 !important;
+  font-weight: 500 !important; font-size: .88rem !important;
+  padding: .65rem 1.4rem !important; color: #9E9E9E !important;
   border-bottom: 3px solid transparent !important;
   background: transparent !important;
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
+  font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
 }
 [data-baseweb="tab"][aria-selected="true"] {
-  color: #1e40af !important;
-  border-bottom: 3px solid #3b82f6 !important;
+  color: #F57C00 !important;
+  border-bottom: 3px solid #F57C00 !important;
+  font-weight: 700 !important;
 }
 [data-baseweb="tab-panel"] {
   background: #fff !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid #E0E0E0 !important;
   border-top: none !important;
-  border-radius: 0 0 8px 8px !important;
+  border-radius: 0 0 6px 6px !important;
   padding: 1.2rem 1.4rem !important;
 }
 
 /* ── KPI 카드 ── */
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .85rem; margin-bottom: 1.2rem; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 1.2rem; }
 .kpi-card {
-  background: #fff; border-radius: 10px;
-  padding: 1.05rem 1.3rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
-  border-left: 4px solid #ccc;
+  background: #fff; border-radius: 6px;
+  padding: 1rem 1.2rem 1rem;
+  border: 1px solid #E0E0E0;
 }
-.kpi-card.blue  { border-left-color: #3b82f6; }
-.kpi-card.red   { border-left-color: #ef4444; }
-.kpi-card.green { border-left-color: #10b981; }
-.kpi-card.amber { border-left-color: #f59e0b; }
-.kpi-card.indigo { border-left-color: #6366f1; }
-
-.kpi-lbl  { font-size: .7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .35rem; }
-.kpi-val  { font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1; }
-.kpi-unit { font-size: .9rem; font-weight: 700; color: #475569; margin-left: .08rem; }
-.kpi-sub  { font-size: .71rem; color: #94a3b8; margin-top: .3rem; }
-.kpi-up   { color: #ef4444; font-weight: 700; }
-.kpi-dn   { color: #3b82f6; font-weight: 700; }
+.kpi-lbl  { font-size: .7rem; color: #9E9E9E; font-weight: 500; letter-spacing: .01em; margin-bottom: .4rem; }
+.kpi-val  { font-size: 2.4rem; font-weight: 700; color: #212121; line-height: 1; letter-spacing: -.03em; }
+.kpi-val.orange { color: #F57C00; }
+.kpi-val.red    { color: #E53E3E; }
+.kpi-val.blue   { color: #1565C0; }
+.kpi-unit { font-size: 1rem; font-weight: 500; color: #616161; margin-left: .05rem; }
+.kpi-sub  { font-size: .71rem; color: #9E9E9E; margin-top: .4rem; line-height: 1.6; }
+.kpi-up   { color: #E53E3E; font-weight: 700; }
+.kpi-dn   { color: #1565C0; font-weight: 700; }
 
 /* ── 섹션 헤더 ── */
 .sec-hd {
   display: flex; align-items: center; gap: .4rem;
-  font-size: .88rem; font-weight: 800; color: #0f172a;
-  padding-bottom: .6rem; margin: 1rem 0 .75rem;
-  border-bottom: 2px solid #e2e8f0;
+  font-size: .87rem; font-weight: 700; color: #212121;
+  padding-bottom: .55rem; margin: 1rem 0 .7rem;
+  border-bottom: 1.5px solid #E0E0E0;
 }
-.sec-bar { width: 4px; height: 16px; border-radius: 2px; background: #3b82f6; flex-shrink: 0; }
+.sec-bar { width: 3px; height: 14px; border-radius: 2px; background: #F57C00; flex-shrink: 0; }
+.sec-sub { font-size: .7rem; color: #9E9E9E; font-weight: 400; margin-left: .3rem; }
 
 /* ── 버튼 ── */
 .stButton > button {
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
-  font-weight: 700 !important; border-radius: 6px !important;
-  font-size: .83rem !important;
+  font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
+  font-weight: 500 !important; border-radius: 999px !important;
+  font-size: .82rem !important; transition: all .12s !important;
+  padding: .35rem .9rem !important;
+}
+button[kind="primary"] {
+  background: #F57C00 !important; border-color: #F57C00 !important;
+  color: #fff !important; font-weight: 700 !important;
+}
+button[kind="secondary"] {
+  background: #fff !important; border-color: #BDBDBD !important; color: #424242 !important;
+}
+button[kind="secondary"]:hover {
+  border-color: #F57C00 !important; color: #E65100 !important;
 }
 .stDownloadButton > button {
-  background: #0f172a !important; color: #fff !important;
+  background: #37474F !important; color: #fff !important;
   border: none !important; border-radius: 6px !important;
-  font-weight: 700 !important; font-size: .83rem !important;
-  font-family: 'NanumSquareNeo', 'Malgun Gothic', sans-serif !important;
+  font-weight: 500 !important; font-size: .82rem !important;
+  font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
   padding: .5rem 1rem !important;
 }
-.stDownloadButton > button:hover { background: #1e293b !important; }
+.stDownloadButton > button:hover { background: #455A64 !important; }
 
 /* ── 월 선택기 ── */
 .yr-mo-area {
-  background: #f8faff; border-radius: 8px;
-  border: 1px solid #e2e8f0; padding: .85rem 1rem; margin-bottom: 1rem;
+  background: #FAFAFA; border-radius: 6px;
+  border: 1px solid #E0E0E0; padding: .7rem .9rem; margin-bottom: 1rem;
   display: flex; align-items: flex-start; gap: 1.2rem;
 }
-.yr-label { font-size: .68rem; font-weight: 800; color: #94a3b8; letter-spacing: .08em;
-            text-transform: uppercase; margin-bottom: .4rem; }
+.yr-label { font-size: .67rem; font-weight: 700; color: #9E9E9E; letter-spacing: .06em;
+            text-transform: uppercase; margin-bottom: .35rem; }
 
 /* ── 변동 카드 (신규/추가/수금) ── */
 .chg-card {
-  background: #fff; border-radius: 10px;
-  border-top: 3px solid #ccc;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
-  padding: .95rem 1.1rem;
+  background: #fff; border-radius: 6px;
+  border: 1px solid #E0E0E0;
+  overflow: hidden;
 }
-.chg-card.red   { border-top-color: #ef4444; }
-.chg-card.amber { border-top-color: #f59e0b; }
-.chg-card.green { border-top-color: #10b981; }
-.chg-title { font-size: .85rem; font-weight: 800; margin-bottom: .5rem; }
+.chg-head-area {
+  padding: .6rem .9rem;
+  border-bottom: 1px solid #E0E0E0;
+}
+.chg-head-area.red   { background: #FFF5F5; }
+.chg-head-area.amber { background: #FFFBEB; }
+.chg-head-area.green { background: #F0FDF4; }
+.chg-body { padding: .7rem .9rem; }
+.chg-title { font-size: .84rem; font-weight: 700; }
+.chg-title.red   { color: #C53030; }
+.chg-title.amber { color: #C05621; }
+.chg-title.green { color: #276749; }
+.chg-cnt  { font-size: .71rem; color: #9E9E9E; margin-left: .3rem; }
 .chg-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: .38rem 0; border-bottom: 1px solid #f1f5f9;
-  font-size: .82rem;
+  padding: .35rem 0; border-bottom: 1px solid #F5F5F5;
+  font-size: .81rem;
 }
-.chg-name { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.chg-name { color: #424242; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62%; }
+.chg-org  { font-size: .68rem; color: #BDBDBD; margin-left: .25rem; }
 .chg-amt  { font-weight: 700; white-space: nowrap; }
+.chg-none { color: #BDBDBD; font-size: .81rem; padding: 1rem 0; text-align: center; }
 
 /* ── 랭킹 ── */
 .rank-item {
   display: grid; grid-template-columns: 2rem 1fr 5.5rem;
   align-items: center; gap: .7rem;
-  padding: .52rem 0; border-bottom: 1px solid #f1f5f9;
+  padding: .5rem 0; border-bottom: 1px solid #F5F5F5;
 }
 .rank-badge {
   width: 1.4rem; height: 1.4rem; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: .72rem; font-weight: 800; color: #fff; flex-shrink: 0;
+  font-size: .7rem; font-weight: 700; color: #fff; flex-shrink: 0;
 }
-.rank-bar-bg { background: #f1f5f9; border-radius: 3px; height: 6px; margin-top: .28rem; overflow: hidden; }
-.rank-bar-fg { height: 100%; border-radius: 3px; }
+.rank-bar-bg { background: #F5F5F5; border-radius: 2px; height: 5px; margin-top: .22rem; overflow: hidden; }
+.rank-bar-fg { height: 100%; border-radius: 2px; }
 
-/* ── 집계 테이블 스타일 ── */
-[data-testid="stDataFrame"] { border-radius: 8px; overflow: hidden; }
+/* ── 집계 테이블 ── */
+.agg-tbl { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.agg-tbl thead tr th {
+  background: #37474F; color: #ECEFF1;
+  font-weight: 700; font-size: .72rem;
+  padding: .65rem .85rem; text-align: right; white-space: nowrap;
+}
+.agg-tbl thead tr th:first-child { text-align: left; }
+.agg-tbl tbody td {
+  padding: .5rem .85rem; border-bottom: 1px solid #F5F5F5;
+  color: #424242; text-align: right; white-space: nowrap;
+}
+.agg-tbl tbody td:first-child { text-align: left; font-weight: 600; color: #212121; }
+.agg-tbl tbody tr:last-child td {
+  background: #37474F; color: #ECEFF1; font-weight: 700; border-top: none;
+}
+.agg-tbl tbody tr:hover td { background: #FFF8F0; }
+.agg-tbl .has-val { color: #E65100; font-weight: 700; }
+.agg-tbl .zero    { color: #BDBDBD; }
+
+/* ── dataframe ── */
+[data-testid="stDataFrame"] { border-radius: 6px; overflow: hidden; }
+[data-testid="stDataFrame"] th {
+  background: #37474F !important; color: #ECEFF1 !important;
+  font-size: .78rem !important; font-weight: 700 !important;
+}
 
 /* ── 배지 ── */
 .badge {
-  display: inline-block; font-size: .68rem; font-weight: 700;
-  padding: .1rem .45rem; border-radius: 3px; margin-left: .3rem; vertical-align: middle;
+  display: inline-block; font-size: .68rem; font-weight: 600;
+  padding: .08rem .42rem; border-radius: 3px; margin-left: .3rem; vertical-align: middle;
 }
-.badge-blue  { background: #eff6ff; color: #3b82f6; }
-.badge-gray  { background: #f1f5f9; color: #64748b; }
+.badge-orange { background: #FFF3E0; color: #E65100; border: 1px solid #FFCC80; }
+.badge-gray   { background: #F5F5F5; color: #757575; }
+.badge-blue   { background: #E3F2FD; color: #1565C0; }
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
@@ -199,7 +245,7 @@ EXCLUDE_CODES  = {"10014461","C4900","C2000","C3100"}
 EXCLUDE_BU     = {"기타사업부","수탁사업부","완제사업부"}
 EXCLUDE_OFFICE = {"DW_B2B","DW_CH신사업팀"}
 EXCLUDE_MGR    = {"1202150261"}
-FONT           = "NanumSquareNeo,Malgun Gothic,sans-serif"
+FONT           = "Noto Sans KR,Apple SD Gothic Neo,Malgun Gothic,sans-serif"
 
 def _num(v):
     try: return float(str(v).replace(",","").strip())
@@ -775,11 +821,11 @@ def run_calc(m_b, b_b, c_b, t_b):
 today_str = date.today().strftime("%Y. %m. %d")
 st.markdown(f"""
 <div class="top-header">
-  <div>
-    <div class="hd-title">지체보상금 대시보드</div>
-    <div class="hd-sub">DW07 · DW11 채널 | 월말 순실잔고 × 증분지연일수 × 1/1000</div>
+  <div class="hd-left">
+    <div class="hd-title">대웅제약 지체보상금 대시보드</div>
+    <div class="hd-sub">데이터 기준일: {today_str} &nbsp;|&nbsp; DW07 · DW11 채널 · 계약 지체보상금 조항 보유 거래처</div>
   </div>
-  <div class="hd-badge">{today_str} 기준</div>
+  <div class="hd-badge">thync™ 채널</div>
 </div>""", unsafe_allow_html=True)
 
 # ── 데이터 계산
@@ -817,22 +863,22 @@ with tab_agg:
 
     st.markdown(f"""
     <div class="kpi-row">
-      <div class="kpi-card blue">
+      <div class="kpi-card">
         <div class="kpi-lbl">전체 기간 지체보상금</div>
-        <div class="kpi-val">{fmt_won(total_all, short=True)}</div>
+        <div class="kpi-val orange">{fmt_won(total_all, short=True)}</div>
         <div class="kpi-sub">{months_sorted[0]} ~ {months_sorted[-1]}</div>
       </div>
-      <div class="kpi-card indigo">
+      <div class="kpi-card">
         <div class="kpi-lbl">{cur_yr}년 누계</div>
-        <div class="kpi-val">{fmt_won(ann_total, short=True)}</div>
+        <div class="kpi-val orange">{fmt_won(ann_total, short=True)}</div>
         <div class="kpi-sub">{cur_yr}년 발생 합계</div>
       </div>
-      <div class="kpi-card red">
+      <div class="kpi-card">
         <div class="kpi-lbl">청구 거래처 수 (전 기간)</div>
-        <div class="kpi-val">{total_vend}<span class="kpi-unit">개</span></div>
+        <div class="kpi-val red">{total_vend}<span class="kpi-unit">개</span></div>
         <div class="kpi-sub">지체보상금 발생 고유 거래처</div>
       </div>
-      <div class="kpi-card amber">
+      <div class="kpi-card">
         <div class="kpi-lbl">최고 발생 월</div>
         <div class="kpi-val">{mo_label(best_mo) if best_mo != "-" else "-"}</div>
         <div class="kpi-sub">{fmt_won(best_mo_amt)}</div>
@@ -867,7 +913,7 @@ with tab_agg:
 
         def _agg_style(row):
             if row["기준월"] == "▶ 합계":
-                return ["background:#eff6ff;font-weight:bold;color:#1e40af"] * len(row)
+                return ["background:#FFF3E0;font-weight:bold;color:#E65100"] * len(row)
             if row["지체보상금 (원)"] and row["지체보상금 (원)"] != "-" and int(row["지체보상금 (원)"]) > 0:
                 return ["background:#fff7ed"] * len(row)
             return [""] * len(row)
@@ -892,7 +938,7 @@ with tab_agg:
 
         x_all = [mo_label(m) for m in months_sorted]
         y_all = [int(mo_sum.get(m, 0)) / 10000 for m in months_sorted]
-        bar_colors_all = ["#3b82f6" if int(mo_sum.get(m, 0)) > 0 else "#e2e8f0" for m in months_sorted]
+        bar_colors_all = ["#F57C00" if int(mo_sum.get(m, 0)) > 0 else "#E0E0E0" for m in months_sorted]
         cum_all = []
         run = 0
         for v in y_all:
@@ -903,7 +949,7 @@ with tab_agg:
         fig.add_trace(go.Scatter(
             x=x_all, y=cum_all, name="누적",
             mode="lines", line=dict(color="rgba(0,0,0,0)", width=0),
-            fill="tozeroy", fillcolor="rgba(59,130,246,0.07)",
+            fill="tozeroy", fillcolor="rgba(245,124,0,0.07)",
             hoverinfo="skip", yaxis="y2", showlegend=False,
         ))
         fig.add_trace(go.Bar(
@@ -1080,24 +1126,24 @@ with tab_detail:
     # ── 월 KPI ──────────────────────────────────────────────
     st.markdown(f"""
     <div class="kpi-row">
-      <div class="kpi-card blue">
+      <div class="kpi-card">
         <div class="kpi-lbl">{mo_label(sel)} 지체보상금</div>
-        <div class="kpi-val">{fmt_won(sel_total, short=True)}</div>
+        <div class="kpi-val orange">{fmt_won(sel_total, short=True)}</div>
         <div class="kpi-sub">{d_html}</div>
       </div>
-      <div class="kpi-card red">
+      <div class="kpi-card">
         <div class="kpi-lbl">청구 건수</div>
-        <div class="kpi-val">{sel_n}<span class="kpi-unit">건</span></div>
+        <div class="kpi-val red">{sel_n}<span class="kpi-unit">건</span></div>
         <div class="kpi-sub">{_delta_html(sel_n, prev_n, "건")}</div>
       </div>
-      <div class="kpi-card green">
+      <div class="kpi-card">
         <div class="kpi-lbl">청구 거래처</div>
-        <div class="kpi-val">{sel_cu}<span class="kpi-unit">개</span></div>
+        <div class="kpi-val blue">{sel_cu}<span class="kpi-unit">개</span></div>
         <div class="kpi-sub">{_delta_html(sel_cu, prev_cu, "개")}</div>
       </div>
-      <div class="kpi-card amber">
+      <div class="kpi-card">
         <div class="kpi-lbl">{_sel_yr}년 누계</div>
-        <div class="kpi-val">{fmt_won(ann_sel, short=True)}</div>
+        <div class="kpi-val orange">{fmt_won(ann_sel, short=True)}</div>
         <div class="kpi-sub">{_sel_yr}년 1월 ~ {mo_label(sel)}</div>
       </div>
     </div>
@@ -1179,7 +1225,7 @@ with tab_detail:
         all_12 = [f"{_sel_yr}-{mo:02d}" for mo in range(1, 13)]
         x_12 = [f"{int(m.split('-')[1])}월" for m in all_12]
         y_12 = [int(mo_sum.get(m, 0)) / 10000 for m in all_12]
-        bar_col_12 = ["#3b82f6" if m == sel else ("#dbeafe" if mo_sum.get(m, 0) > 0 else "#f1f5f9") for m in all_12]
+        bar_col_12 = ["#F57C00" if m == sel else ("#FFCC80" if mo_sum.get(m, 0) > 0 else "#E0E0E0") for m in all_12]
         cum_12 = []
         run = 0
         for v in y_12:
