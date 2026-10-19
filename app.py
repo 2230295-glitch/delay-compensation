@@ -827,12 +827,13 @@ def run_calc(m_b, b_b, c_b, t_b):
     months = load_think_monthly(t_b) if t_b else load_monthly(m_b)
     if t_b and m_b:
         sap_months = load_monthly(m_b)
+        _씽크ch = {"씽크", "DW11", "DW12"}
+        # SAP balance lookup for Think entries (non-씽크 rows in Think months)
         sap_bal: dict = {}
         for _me in sap_months:
             for _, _r in _me["data"].iterrows():
                 _k = (str(_r["코드"]).strip(), _me["yr"], _me["mo"])
                 sap_bal[_k] = (int(_r["잔고"]), int(_r["현회전일"]))
-        _씽크ch = {"씽크", "DW11", "DW12"}
         for _me in months:
             _df = _me["data"].copy()
             for _i, _r in _df[~_df["채널"].isin(_씽크ch)].iterrows():
@@ -843,6 +844,19 @@ def run_calc(m_b, b_b, c_b, t_b):
                 else:
                     _df.at[_i, "잔고"] = 0
             _me["data"] = _df[_df["잔고"] > 0].reset_index(drop=True)
+        # DW07(오프라인) 월별 데이터를 Think 월별 목록에 병합
+        think_keys = {(_me["yr"], _me["mo"]): _me for _me in months}
+        for _sme in sap_months:
+            _dw07 = _sme["data"][~_sme["data"]["채널"].isin(_씽크ch)].copy()
+            if _dw07.empty:
+                continue
+            _key = (_sme["yr"], _sme["mo"])
+            if _key in think_keys:
+                think_keys[_key]["data"] = pd.concat(
+                    [think_keys[_key]["data"], _dw07], ignore_index=True)
+            else:
+                months.append({"yr": _sme["yr"], "mo": _sme["mo"], "data": _dw07})
+        months.sort(key=lambda x: (x["yr"], x["mo"]))
     org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
     if org_map and not result.empty:
