@@ -377,9 +377,15 @@ def load_contract(file_bytes, sap_df):
 def load_base(file_bytes, cmap=None, think_rotations=None):
     df = pd.read_excel(io.BytesIO(file_bytes), dtype=str).dropna(how="all")
     df.columns = [str(c).strip() for c in df.columns]
+    def _norm_code(v):
+        s = str(v).strip()
+        if '.' in s:
+            try: return str(int(float(s)))
+            except: pass
+        return s
     out = []
     for _, r in df.iterrows():
-        code = str(r.get("판매처","")).strip(); name = str(r.get("판매처명","")).strip()
+        code = _norm_code(r.get("판매처","")); name = str(r.get("판매처명","")).strip()
         base = _num(r.get("기준회전일",0)); yak = _num(r.get("약정회전일",0))
         exc  = _num(r.get("예외회전일",0))
         if not code or code == "nan" or pd.isna(base) or base <= 0: continue
@@ -503,7 +509,13 @@ def load_monthly(file_bytes, think_codes=None):
     df = df.drop_duplicates(subset=["년월", "판매처", "채널"], keep="last")
     months = []
     for (yr, mo), grp in df.groupby(["_yr","_mo"]):
-        rows = [{"연":int(yr),"월":int(mo),"코드":str(r["판매처"]).strip(),
+        def _nc(v):
+            s = str(v).strip()
+            if '.' in s:
+                try: return str(int(float(s)))
+                except: pass
+            return s
+        rows = [{"연":int(yr),"월":int(mo),"코드":_nc(r["판매처"]),
                  "명칭":str(r.get("판매처명","")).strip(),"채널":str(r.get("채널","")).strip(),
                  "잔고":r["_잔고"],"현회전일":r["_일수"],
                  "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
@@ -859,11 +871,18 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
     cmap = {}
     n_yes = n_no = 0
     if c_b:
-        cmap, n_yes, n_no = load_contract(c_b, sap_raw)
+        try:
+            cmap, n_yes, n_no = load_contract(c_b, sap_raw)
+        except Exception:
+            cmap = {}
 
     # 기준회전일 (씽크 파일의 회전일 오버라이드 반영)
     think_rot = load_think(t_b) if t_b else None
-    bdf = load_base(b_b, cmap if cmap else None, think_rot)
+    _eff_cmap = cmap if cmap else None
+    bdf = load_base(b_b, _eff_cmap, think_rot)
+    # cmap이 있는데 매칭된 거래처가 0건이면 fallback (코드 불일치 방어)
+    if _eff_cmap is not None and not bdf.empty and not bdf["지체여부"].any():
+        bdf = load_base(b_b, None, think_rot)
 
     # 월별 데이터: 항상 SAP 파일 사용 (DW07/DW11 채널 모두 포함)
     months = load_monthly(m_b)
