@@ -332,20 +332,32 @@ def load_contract(file_bytes, sap_df):
     except Exception:
         return {}, 0, 0
 
-    # 헤더 행 자동 탐지: '거래처코드' 컬럼 위치로 나머지 컬럼도 위치 확정
-    FIXED = {"code": 2, "name": 9, "type": 11, "biz": 12, "jiche": 24}  # 로컬 확인값 기본
+    # 헤더 행 자동 탐지: 계약서 형식 or raw 파일 형식 둘 다 지원
+    FIXED = {}
+    fmt = None   # 'contract' | 'raw'
     data_start = 12
-    for ridx, hrow in enumerate(ws.iter_rows(min_row=1, max_row=25, values_only=True), start=1):
+    for ridx, hrow in enumerate(ws.iter_rows(min_row=1, max_row=30, values_only=True), start=1):
         cells = [str(v or '').replace('\n', '').strip() for v in hrow]
         if any('거래처코드' in c for c in cells):
-            data_start = ridx + 1
+            fmt = 'contract'; data_start = ridx + 1
             for i, c in enumerate(cells):
                 if '거래처코드' in c: FIXED['code'] = i
-                if '계약유형' in c:   FIXED['type'] = i
+                if '계약유형'  in c:  FIXED['type'] = i
                 if '사업자' in c and ('번호' in c or '등록' in c): FIXED['biz'] = i
                 if '지체보상금' in c: FIXED['jiche'] = i
                 if ('판매처' in c and '갑' in c) or '병원명' in c: FIXED['name'] = i
             break
+        if any(c in ('실납처', '실 납처') for c in cells):
+            fmt = 'raw'; data_start = ridx + 1
+            for i, c in enumerate(cells):
+                if c in ('실납처', '실 납처'):   FIXED['code'] = i
+                if c in ('실납처명', '실 납처명'): FIXED['name'] = i
+                if c == '유형':                   FIXED['type'] = i
+            break
+    # fallback: 로컬 계약서 Excel 확인값
+    if fmt is None: fmt = 'contract'
+    FIXED.setdefault('code', 2); FIXED.setdefault('name', 9)
+    FIXED.setdefault('type', 11); FIXED.setdefault('biz', 12); FIXED.setdefault('jiche', 24)
 
     result = {}
     for row in ws.iter_rows(min_row=data_start, max_row=ws.max_row, values_only=True):
@@ -358,15 +370,19 @@ def load_contract(file_bytes, sap_df):
             if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
             if isinstance(v, int):   return str(v)
             return str(v).strip()
-        code  = _cell(row[FIXED["code"]])
-        name  = _cell(row[FIXED["name"]])
-        ctype = _cell(row[FIXED["type"]])
-        biz   = _cell(row[FIXED["biz"]])
-        y_val = _cell(row[FIXED["jiche"]]) if len(row) > FIXED["jiche"] else ''
+        code  = _cell(row[FIXED["code"]]) if len(row) > FIXED["code"] else ''
+        name  = _cell(row[FIXED["name"]]) if len(row) > FIXED["name"] else ''
+        ctype = _cell(row[FIXED["type"]]) if len(row) > FIXED["type"] else ''
+        biz   = _cell(row[FIXED.get("biz", 12)]) if fmt == 'contract' and len(row) > FIXED.get("biz", 12) else ''
+        y_val = _cell(row[FIXED.get("jiche", 24)]) if fmt == 'contract' and len(row) > FIXED.get("jiche", 24) else ''
 
-        is_yes = bool(y_val)
-        rate_m = re.search(r'\[(\d+)/(\d+)\]', y_val)
-        rate   = float(rate_m.group(1)) / float(rate_m.group(2)) if rate_m else 1/1000
+        if fmt == 'raw':
+            is_yes = True   # raw 파일에 있으면 계약 보유
+            rate   = 1/1000
+        else:
+            is_yes = bool(y_val)
+            rate_m = re.search(r'\[(\d+)/(\d+)\]', y_val)
+            rate   = float(rate_m.group(1)) / float(rate_m.group(2)) if rate_m else 1/1000
 
         # 코드가 없거나 비어있으면 이름 매칭으로 보완
         if not code or code == 'nan':
@@ -512,7 +528,10 @@ def load_monthly(file_bytes, think_codes=None):
     df = df.dropna(subset=["_잔고","_일수"]).copy(); df["_일수"] = df["_일수"].astype(int)
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
-    # DW07은 2025년 이전 데이터만 사용
+    # 씽크 채널(DW07/DW11): 씽크 서비스 시작 이전 데이터 제외 (2024년 12월부터)
+    pre_think = (df["_yr"] < 2024) | ((df["_yr"] == 2024) & (df["_mo"] < 12))
+    df = df[~pre_think]
+    # DW07은 2025년 이후 데이터 제외
     dw07_post25 = (df["채널"] == "DW07") & (df["_yr"] >= 2025)
     df = df[~dw07_post25]
     if think_codes and "채널" in df.columns:
