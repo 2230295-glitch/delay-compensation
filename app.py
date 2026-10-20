@@ -317,9 +317,14 @@ def _norm(s):
 def load_contract(file_bytes, sap_df):
     import openpyxl as _xl
     # SAP 기준파일 이름→코드 매핑 (이름 매칭 fallback용)
-    s2 = sap_df.copy(); s2['_norm'] = s2['판매처명'].apply(_norm)
-    sm = dict(zip(s2['_norm'], s2['판매처']))
-    sn_list = list(s2['_norm']); sc_list = list(s2['판매처'])
+    s2 = sap_df.copy()
+    _name_col = next((c for c in s2.columns if '판매처명' in c or '명칭' in c), None)
+    if _name_col:
+        s2['_norm'] = s2[_name_col].apply(_norm)
+        sm = dict(zip(s2['_norm'], s2.get('판매처', s2.iloc[:, 0])))
+        sn_list = list(s2['_norm']); sc_list = list(sm.values())
+    else:
+        sm = {}; sn_list = []; sc_list = []
 
     try:
         wb = _xl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
@@ -923,6 +928,19 @@ with st.spinner("데이터 계산 중..."):
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
+
+# 계약 매핑 디버그 (문제 확인용)
+with st.expander("🔧 계약 매핑 상태 확인", expanded=False):
+    st.write(f"**cmap 크기**: {len(contract_map)}건")
+    if contract_map:
+        sample_keys = list(contract_map.keys())[:5]
+        st.write(f"**cmap 코드 샘플**: {sample_keys}")
+        st.write(f"**cmap 값 샘플**: {[contract_map[k] for k in sample_keys]}")
+    if not result_df.empty:
+        sample_codes = list(result_df["판매처코드"].unique()[:5])
+        st.write(f"**결과 판매처코드 샘플**: {sample_codes}")
+        matched = sum(1 for c in result_df["판매처코드"].unique() if c in contract_map)
+        st.write(f"**cmap 매칭 건수**: {matched} / {result_df['판매처코드'].nunique()}")
 
 months_sorted = sorted(result_df["기준월"].unique())
 mo_sum = result_df.groupby("기준월")["지체보상금"].sum()
