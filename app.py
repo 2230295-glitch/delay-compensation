@@ -332,11 +332,23 @@ def load_contract(file_bytes, sap_df):
     except Exception:
         return {}, 0, 0
 
-    # 헤더 행 스캔: '거래처코드' 또는 '병원명' 키워드가 있는 행을 헤더로 사용
-    # 없으면 recalculate_with_contract.py 기준 고정 위치 (min_row=12) 사용
-    FIXED = {"code": 2, "name": 1, "type": 3, "biz": 4, "jiche": 24}  # 0-indexed 열 위치
+    # 헤더 행 자동 탐지: '거래처코드' 컬럼 위치로 나머지 컬럼도 위치 확정
+    FIXED = {"code": 2, "name": 9, "type": 11, "biz": 12, "jiche": 24}  # 로컬 확인값 기본
+    data_start = 12
+    for ridx, hrow in enumerate(ws.iter_rows(min_row=1, max_row=25, values_only=True), start=1):
+        cells = [str(v or '').replace('\n', '').strip() for v in hrow]
+        if any('거래처코드' in c for c in cells):
+            data_start = ridx + 1
+            for i, c in enumerate(cells):
+                if '거래처코드' in c: FIXED['code'] = i
+                if '계약유형' in c:   FIXED['type'] = i
+                if '사업자' in c and ('번호' in c or '등록' in c): FIXED['biz'] = i
+                if '지체보상금' in c: FIXED['jiche'] = i
+                if ('판매처' in c and '갑' in c) or '병원명' in c: FIXED['name'] = i
+            break
+
     result = {}
-    for row in ws.iter_rows(min_row=12, max_row=ws.max_row, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, max_row=ws.max_row, values_only=True):
         if not row or len(row) < 3: continue
         no_val = row[0]
         if not str(no_val or '').strip().isdigit(): continue
