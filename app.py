@@ -989,8 +989,10 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
+_CALC_VER = "v14"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None):
+def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
     months = load_monthly(m_b)
     org_map = _build_org_map(m_b)
 
@@ -1070,7 +1072,7 @@ if not (m_b and b_b):
     st.stop()
 
 with st.spinner("데이터 계산 중..."):
-    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b)
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b, ver=_CALC_VER)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
