@@ -550,6 +550,9 @@ def load_monthly(file_bytes, think_codes=None):
     df["_yr"] = df["_yr"].astype(int); df["_mo"] = df["_mo"].astype(int)
     df["_잔고"] = df["순실잔고"].apply(_num); df["_일수"] = df["순실회전일"].apply(_num)
     df = df.dropna(subset=["_잔고","_일수"]).copy(); df["_일수"] = df["_일수"].astype(int)
+    # 당월 발생 미수금(납기 미도달): 잔고(1∼30) 버킷 — 지체보상금 기준 제외 대상
+    _col_1_30 = next((c for c in df.columns if '잔고(1' in c and '30' in c), None)
+    df["_이번달잔고"] = df[_col_1_30].apply(_num).fillna(0) if _col_1_30 else 0
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     # 씽크 채널: 2025년 이전 데이터 제외 (12월 매출 → 납기 미도달, 지체보상금 구조적 불가)
@@ -576,6 +579,7 @@ def load_monthly(file_bytes, think_codes=None):
         rows = [{"연":int(yr),"월":int(mo),"코드":_nc(r["판매처"]),
                  "명칭":str(r.get("판매처명","")).strip(),"채널":str(r.get("채널","")).strip(),
                  "잔고":r["_잔고"],"현회전일":r["_일수"],
+                 "이번달잔고": float(r.get("_이번달잔고", 0) or 0),
                  "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
                  "사업부":str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
                  "담당자":str(r.get("담당자명","")).strip() if "담당자명" in r.index else "",
@@ -597,10 +601,12 @@ def calculate(months, base_df):
             기준 = int(row["_기준회전일_override"]) if "_기준회전일_override" in row and pd.notna(row["_기준회전일_override"]) else b["유효기준회전일"]
             요율 = b["요율"]
             현 = row["현회전일"]; 잔 = row["잔고"]
+            이번달 = float(row.get("이번달잔고", 0) or 0)
+            연체기준잔 = max(0.0, 잔 - 이번달)  # 당월 납기 미도달분 제외
             지연 = max(0, 현 - 기준); prev = cum.get(code, 0)
             if 지연 <= 0: cum[code] = 0; 증분 = 0
             else: 증분 = max(0, 지연 - prev); cum[code] = max(prev, 지연)
-            보상 = round(잔 * 증분 * 요율) if 증분 > 0 else 0
+            보상 = round(연체기준잔 * 증분 * 요율) if 증분 > 0 else 0
             rate_str = f"1/{int(round(1/요율))}" if 요율 > 0 else "-"
             results.append({
                 "기준월":f"{yr}-{mo:02d}","판매처코드":code,"판매처명":row["명칭"],
