@@ -1008,7 +1008,8 @@ THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path(
 CT_LIST   = [f for f in sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
              if f.name not in ("raw_thync.xlsx", "ct_biz.xlsx")]
 CT_PATH   = CT_LIST[0] if CT_LIST else None
-CT_BIZ_PATH = Path("input/계약정보/ct_biz.xlsx")  # 보조 사업자번호 소스 (이름 매칭)
+CT_BIZ_PATH   = Path("input/계약정보/ct_biz.xlsx")    # 보조 사업자번호 소스 (이름 매칭)
+THINK25_PATH  = Path("input/계약정보/think25.xlsx")   # 씽크 25년 현황 — 코드 직접 매핑 (187/187)
 CT_CSV    = Path("input/계약정보/계약_매핑결과.csv")
 
 @st.cache_data(show_spinner=False)
@@ -1039,7 +1040,8 @@ c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
 t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 csv_b = CT_CSV.read_bytes() if CT_CSV.exists() else None
 raw_b  = _read_bytes(str(RAW_PATH))
-biz2_b = _read_bytes(str(CT_BIZ_PATH))  # 보조 사업자번호 파일
+biz2_b     = _read_bytes(str(CT_BIZ_PATH))   # 보조 사업자번호 파일
+think25_b  = _read_bytes(str(THINK25_PATH))  # 씽크 25년 현황 (코드 직접 매핑)
 
 def _build_org_map(m_b):
     if not m_b: return {}
@@ -1058,10 +1060,10 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v22"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v23"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, ver=_CALC_VER):
+def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
     months = load_monthly(m_b)
     org_map = _build_org_map(m_b)
 
@@ -1093,7 +1095,25 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, ver=_CALC_
              "지체여부": True, "요율": 1/1000}
             for code, info in raw_vendors.items()
         ])
-        # 사업자번호: 계약서 파일 (거래처코드 우선) + 보조파일 (이름 매칭)
+        # 사업자번호: think25.xlsx (코드 직접) → 계약서 파일 → 보조파일 (이름 매칭)
+        # 1) think25.xlsx — 판매처(col4) + 사업자번호(col3), 187/187 커버
+        think25_code_map = {}
+        if think25_b:
+            try:
+                import openpyxl as _xl25
+                _wb25 = _xl25.load_workbook(io.BytesIO(think25_b), data_only=True, read_only=True)
+                _ws25 = _wb25['씽크현황'] if '씽크현황' in _wb25.sheetnames else _wb25.active
+                def _c25(v):
+                    if v is None: return ''
+                    if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
+                    return str(v).strip()
+                for _row in _ws25.iter_rows(min_row=4, values_only=True):
+                    if not _row: continue
+                    _code = _c25(_row[4]); _biz = _c25(_row[3]).replace('-','').split('_')[0]
+                    if _code and _biz and _code.isdigit(): think25_code_map[_code] = _biz
+                try: _wb25.close()
+                except: pass
+            except Exception: pass
         biz_map = {}
         if c_b:
             try: biz_map = _load_biz_map(c_b)
@@ -1123,9 +1143,9 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, ver=_CALC_
             except Exception: pass
         cmap = {}
         for code, info in raw_vendors.items():
-            biz = biz_map.get(code, '')
-            if not biz:
-                biz = biz_map.get(_norm(info["명칭"]), '')
+            biz = think25_code_map.get(code, '')  # 1순위: think25 코드 직접
+            if not biz: biz = biz_map.get(code, '')  # 2순위: 계약서 코드
+            if not biz: biz = biz_map.get(_norm(info["명칭"]), '')  # 3순위: 계약서 이름
             if not biz:  # 보조 파일 이름 매칭
                 nk = _norm(info["명칭"])
                 biz = biz2_name.get(nk, '')
@@ -1182,7 +1202,7 @@ if not (m_b and b_b):
     st.stop()
 
 with st.spinner("데이터 계산 중..."):
-    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b, biz2_b=biz2_b, ver=_CALC_VER)
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b, biz2_b=biz2_b, think25_b=think25_b, ver=_CALC_VER)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
