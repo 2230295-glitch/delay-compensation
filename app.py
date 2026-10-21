@@ -554,7 +554,8 @@ def load_monthly(file_bytes, think_codes=None):
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     # 씽크 채널: 2025년 이전 데이터 제외 (12월 매출 → 납기 미도달, 지체보상금 구조적 불가)
     df = df[df["_yr"] >= 2025]
-    # ※ DW07 2025+ 제외 불필요: 계약서 기반 필터링으로 비씽크 거래처 자동 제외됨
+    # DW07은 2025년까지만 씽크 채널 (2026년부터 DW07은 씽크 아님 → 제외)
+    df = df[~((df["채널"] == "DW07") & (df["_yr"] >= 2026))]
     if think_codes and "채널" in df.columns:
         dw07_mask = df["채널"] == "DW07"
         df = df[~dw07_mask | df["판매처"].isin(think_codes)]
