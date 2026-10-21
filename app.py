@@ -1047,7 +1047,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v18"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v19"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
@@ -1055,7 +1055,7 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
     org_map = _build_org_map(m_b)
 
     # ── raw 파일 우선: 거래처코드 직접 포함, 기준회전일·계약유형 정확
-    raw_vendors = {}
+    raw_vendors = {}; sales_map = {}
     # raw 파일 월별 매출 → 이번달잔고 override (잔고(1∼30) 대신 실제 매출액 사용)
     if raw_b:
         try:
@@ -1073,6 +1073,10 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
     if raw_b:
         try: raw_vendors = load_raw_vendors(raw_b)
         except Exception: pass
+        # raw 매출 실적 없는 거래처 제외 (계약종료/비활성 → 지체보상금 대상 아님)
+        if raw_vendors and sales_map:
+            active_codes = {code for (code, yr, mo) in sales_map}
+            raw_vendors = {k: v for k, v in raw_vendors.items() if k in active_codes}
 
     if raw_vendors:
         # raw 파일에 있는 거래처만 계산 대상
