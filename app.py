@@ -2074,13 +2074,13 @@ with tab_guide:
   </table>
 </div>
 
-<!-- 2. 누적 청구 방식 -->
+<!-- 2. 월별 청구 방식 -->
 <div class="gd-section">
-  <div class="gd-section-hd"><span class="gd-badge blue">2</span> 누적 청구 방식 <span style="font-size:.8rem;color:#64748b;font-weight:400">(핵심)</span></div>
+  <div class="gd-section-hd"><span class="gd-badge blue">2</span> 월별 청구 방식 <span style="font-size:.8rem;color:#64748b;font-weight:400">(핵심)</span></div>
   <div class="gd-items">
-    <div class="gd-item"><div class="gd-dot blue"></div><span>매월 <b>새로 늘어난 금액만</b> 청구 — 이미 청구한 금액은 중복 청구하지 않음</span></div>
-    <div class="gd-item"><div class="gd-dot blue"></div><span>잔고가 늘었거나 지연일수가 늘었으면 → 차액만큼 추가 청구</span></div>
-    <div class="gd-item"><div class="gd-dot blue"></div><span>잔고·지연일수 모두 이전과 같거나 줄었으면 → 이번달 청구 0</span></div>
+    <div class="gd-item"><div class="gd-dot blue"></div><span>각 월을 <b>독립적으로</b> 계산 — 전월 청구 여부와 무관</span></div>
+    <div class="gd-item"><div class="gd-dot blue"></div><span>해당 월의 연체기준잔고 × 지연일수 × 요율 = 이번달 청구액</span></div>
+    <div class="gd-item"><div class="gd-dot blue"></div><span>지연일수가 0 이하이면 → 이번달 청구 0</span></div>
   </div>
   <div class="gd-flow" style="margin-top:1rem">
     <div class="gd-flow-box">연체기준잔고</div>
