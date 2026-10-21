@@ -886,12 +886,21 @@ def load_raw_monthly_sales(file_bytes):
         try: wb.close()
         except: pass
         return {}
-    date_row = all_rows[1]  # Excel 2행: YYYY.MM 날짜 헤더
+    date_row = all_rows[1]  # Excel 2행: 날짜 헤더 (YYYY.MM 또는 N월)
     date_cols = {}
+    last_yr = None
     for i, v in enumerate(date_row):
         s = str(v or '').strip()
-        if len(s) == 7 and s[4] == '.':
-            try: date_cols[(int(s[:4]), int(s[5:]))] = i
+        if len(s) == 7 and s[4] == '.':  # YYYY.MM 형식
+            try:
+                yr, mo = int(s[:4]), int(s[5:])
+                date_cols[(yr, mo)] = i; last_yr = yr
+            except: pass
+        elif s.endswith('월') and s[:-1].isdigit():  # N월 형식 → 다음 연도
+            try:
+                mo = int(s[:-1])
+                yr = (last_yr + 1) if last_yr else 2026
+                date_cols[(yr, mo)] = i
             except: pass
     result = {}
     for row in all_rows[3:]:  # Excel 4행부터 데이터
@@ -1047,7 +1056,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v20"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v21"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
