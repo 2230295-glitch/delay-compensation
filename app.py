@@ -612,7 +612,7 @@ def calculate(months, base_df):
                 "기준월":f"{yr}-{mo:02d}","판매처코드":code,"판매처명":row["명칭"],
                 "채널":row["채널"],
                 "사무소":row.get("사무소",""),"사업부":row.get("사업부",""),"담당자":row.get("담당자",""),
-                "현 미수금":int(잔),"기준회전일(SAP)":b["기준회전일"],
+                "현 미수금":int(잔),"연체기준잔고":int(연체기준잔),"기준회전일(SAP)":b["기준회전일"],
                 "유효기준회전일":기준,"현 회전일":현,"지연일수(누적)":지연,
                 "청구 증분일수":증분,"지체보상금":보상,"요율":rate_str,
                 "비고":"청구" if 보상 > 0 else ("정상화" if 지연 == 0 and prev > 0 else ""),
@@ -1034,7 +1034,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v15"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v16"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
@@ -1761,7 +1761,8 @@ with tab_detail:
 
     def _calc_str(r):
         if r["청구 증분일수"] <= 0: return "—"
-        return f'{int(r["현 미수금"]):,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
+        base = int(r.get("연체기준잔고", r["현 미수금"]))
+        return f'{base:,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
     _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","채널",
