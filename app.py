@@ -1920,79 +1920,215 @@ with tab_detail:
 # ══════════════════════════════════════════════════════════════
 with tab_guide:
     st.markdown("""
-<div style="max-width:820px;margin:0 auto;background:#fff;border-radius:12px;padding:2rem 2.5rem;box-shadow:0 1px 6px rgba(0,0,0,.07)">
+<style>
+.gd-wrap { max-width:860px; margin:0 auto; font-family:'Noto Sans KR','Malgun Gothic',sans-serif; }
+.gd-hero {
+  background: linear-gradient(135deg,#E65100 0%,#F57C00 60%,#FFB300 100%);
+  border-radius:14px; padding:2rem 2.4rem 1.8rem; margin-bottom:1.6rem;
+  color:#fff;
+}
+.gd-hero-title { font-size:1.45rem; font-weight:800; margin:0 0 .4rem; letter-spacing:-.5px; }
+.gd-hero-sub { font-size:.9rem; opacity:.88; margin:0; font-weight:400; }
+.gd-formula {
+  background:#FFF8F1; border-left:4px solid #F57C00; border-radius:0 10px 10px 0;
+  padding:1.1rem 1.4rem; margin:1rem 0 1.4rem; font-size:1.05rem; font-weight:700;
+  color:#BF360C; letter-spacing:-.2px;
+}
+.gd-section {
+  background:#fff; border-radius:12px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;
+  box-shadow:0 1px 6px rgba(0,0,0,.07); border:1px solid #F0F0F0;
+}
+.gd-section-hd {
+  display:flex; align-items:center; gap:.6rem; margin-bottom:1rem;
+  font-size:1rem; font-weight:700; color:#212121;
+}
+.gd-badge {
+  background:#F57C00; color:#fff; border-radius:20px; padding:.15rem .6rem;
+  font-size:.75rem; font-weight:700; flex-shrink:0;
+}
+.gd-badge.blue { background:#3B82F6; }
+.gd-badge.green { background:#22C55E; }
+.gd-badge.purple { background:#8B5CF6; }
+.gd-badge.gray { background:#78909C; }
+.gd-items { display:flex; flex-direction:column; gap:.55rem; }
+.gd-item { display:flex; gap:.8rem; align-items:flex-start; font-size:.88rem; color:#374151; }
+.gd-dot { width:7px; height:7px; border-radius:50%; background:#F57C00; flex-shrink:0; margin-top:.45rem; }
+.gd-dot.blue { background:#3B82F6; }
+.gd-dot.green { background:#22C55E; }
+.gd-tbl { width:100%; border-collapse:collapse; font-size:.84rem; margin-top:.6rem; }
+.gd-tbl th {
+  background:#37474F; color:#fff; padding:.55rem .85rem; text-align:left;
+  font-weight:600; font-size:.8rem;
+}
+.gd-tbl td { padding:.5rem .85rem; border-bottom:1px solid #F0F0F0; color:#374151; }
+.gd-tbl tr:last-child td { border-bottom:none; }
+.gd-tbl tr:nth-child(even) td { background:#FAFAFA; }
+.gd-tbl td:first-child { font-weight:600; color:#1E293B; white-space:nowrap; }
+.gd-ex-tbl { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:.8rem; }
+.gd-ex-tbl th {
+  background:#1A2A6C; color:#fff; padding:.5rem .7rem; text-align:center;
+  font-weight:600; font-size:.79rem;
+}
+.gd-ex-tbl td { padding:.45rem .7rem; border-bottom:1px solid #EEF0F5; text-align:right; color:#374151; }
+.gd-ex-tbl td:first-child { text-align:center; font-weight:600; color:#1E293B; }
+.gd-ex-tbl tr:nth-child(3) td { background:#FFF3E0; font-weight:600; color:#E65100; }
+.gd-ex-tbl tr:last-child td { border-bottom:none; }
+.gd-highlight {
+  background:#FFF3E0; border:1px solid #FFB74D; border-radius:8px;
+  padding:.75rem 1rem; margin-top:.9rem; font-size:.84rem; color:#BF360C;
+  display:flex; gap:.5rem; align-items:flex-start;
+}
+.gd-code {
+  background:#F1F5F9; border-radius:8px; padding:.9rem 1.2rem;
+  font-family:monospace; font-size:.85rem; color:#1E293B;
+  margin:.6rem 0; border-left:3px solid #3B82F6; white-space:pre-wrap;
+}
+.gd-flow {
+  display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+  margin:.8rem 0; font-size:.87rem;
+}
+.gd-flow-box {
+  background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px;
+  padding:.4rem .8rem; color:#1D4ED8; font-weight:600; white-space:nowrap;
+}
+.gd-flow-arrow { color:#94A3B8; font-size:1.1rem; }
+.gd-flow-box.result {
+  background:#FEF3C7; border-color:#FCD34D; color:#92400E; font-size:.95rem;
+}
+.gd-rank { display:flex; flex-direction:column; gap:.5rem; margin-top:.5rem; }
+.gd-rank-item {
+  display:flex; align-items:center; gap:.7rem; background:#FAFAFA;
+  border-radius:8px; padding:.5rem .9rem; font-size:.84rem;
+}
+.gd-rank-num {
+  width:22px; height:22px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-size:.72rem; font-weight:700; flex-shrink:0;
+  color:#fff;
+}
+.gd-tag {
+  display:inline-block; background:#F1F5F9; border-radius:4px;
+  padding:.1rem .4rem; font-family:monospace; font-size:.8rem; color:#475569;
+}
+</style>
 
-## 지체보상금 계산 가이드
+<div class="gd-wrap">
 
----
+<div class="gd-hero">
+  <div class="gd-hero-title">📖 지체보상금 계산 가이드</div>
+  <div class="gd-hero-sub">thync™ 상품공급 계약 기준 · 대웅제약 채권관리팀</div>
+</div>
 
-### 1. 기본 공식
+<!-- 1. 기본 공식 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge">1</span> 기본 공식</div>
+  <div class="gd-formula">지체보상금 = 연체기준잔고 × 지연일수 × 요율 (1/1,000)</div>
+  <table class="gd-tbl">
+    <tr><th>항목</th><th>정의</th></tr>
+    <tr><td>연체기준잔고</td><td>현 미수금 − 이번달 납기 미도달 매출액 (당월 아직 납기 안 된 금액 제외)</td></tr>
+    <tr><td>지연일수 (누적)</td><td>현 회전일 − 기준회전일 (음수면 0으로 처리)</td></tr>
+    <tr><td>요율</td><td>계약서 기준, 기본 1/1,000</td></tr>
+  </table>
+</div>
 
-> **지체보상금 = 연체기준잔고 × 지연일수 × 요율 (1/1,000)**
+<!-- 2. 누적 청구 방식 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge blue">2</span> 누적 청구 방식 <span style="font-size:.8rem;color:#64748b;font-weight:400">(핵심)</span></div>
+  <div class="gd-items">
+    <div class="gd-item"><div class="gd-dot blue"></div><span>매월 <b>새로 늘어난 금액만</b> 청구 — 이미 청구한 금액은 중복 청구하지 않음</span></div>
+    <div class="gd-item"><div class="gd-dot blue"></div><span>잔고가 늘었거나 지연일수가 늘었으면 → 차액만큼 추가 청구</span></div>
+    <div class="gd-item"><div class="gd-dot blue"></div><span>잔고·지연일수 모두 이전과 같거나 줄었으면 → 이번달 청구 0</span></div>
+  </div>
+  <div class="gd-flow" style="margin-top:1rem">
+    <div class="gd-flow-box">연체기준잔고 × 지연일수</div>
+    <div class="gd-flow-arrow">−</div>
+    <div class="gd-flow-box">이전 누적 최대값</div>
+    <div class="gd-flow-arrow">×</div>
+    <div class="gd-flow-box">요율 (1/1000)</div>
+    <div class="gd-flow-arrow">=</div>
+    <div class="gd-flow-box result">이번달 청구액</div>
+  </div>
+  <div style="font-size:.78rem;color:#94A3B8;margin-top:.4rem">* 음수면 0 처리 (환급 없음)</div>
+</div>
 
-| 항목 | 설명 |
-|------|------|
-| **연체기준잔고** | 현 미수금 - 이번달 납기 미도달 매출 (당월 납기 안 된 금액 제외) |
-| **지연일수 (누적)** | 현 회전일 - 기준회전일 (0보다 작으면 0) |
-| **요율** | 계약서 기준 (기본 1/1,000) |
+<!-- 3. 예시 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge green">3</span> 월별 예시 <span style="font-size:.8rem;color:#64748b;font-weight:400">(기준회전일 30일)</span></div>
+  <table class="gd-ex-tbl">
+    <tr>
+      <th>월</th><th>현회전일</th><th>지연일수</th><th>연체기준잔고</th>
+      <th>잔고×지연</th><th>전월누적</th><th>이번달 청구</th>
+    </tr>
+    <tr>
+      <td>6월</td><td>59</td><td>29일</td><td>500만</td>
+      <td>1,450만</td><td>0</td><td>14,500원</td>
+    </tr>
+    <tr>
+      <td>7월</td><td>62</td><td>32일</td><td>500만</td>
+      <td>1,600만</td><td>1,450만</td><td>1,500원</td>
+    </tr>
+    <tr>
+      <td>8월</td><td>62</td><td>32일</td><td style="color:#E65100;font-weight:700">800만 ↑</td>
+      <td style="color:#E65100;font-weight:700">2,560만</td><td>1,600만</td>
+      <td style="color:#E65100;font-weight:700">9,600원</td>
+    </tr>
+    <tr>
+      <td>9월</td><td>65</td><td>35일</td><td>800만</td>
+      <td>2,800만</td><td>2,560만</td><td>2,400원</td>
+    </tr>
+  </table>
+  <div class="gd-highlight">
+    <span>💡</span>
+    <span><b>8월 포인트</b> — 지연일수는 7월과 동일(32일)이지만 잔고가 500만→800만으로 증가했으므로 차액(300만×32일×1/1000 = 9,600원)이 추가 청구됩니다.</span>
+  </div>
+</div>
 
----
+<!-- 4. 컬럼 설명 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge purple">4</span> 테이블 컬럼 설명</div>
+  <table class="gd-tbl">
+    <tr><th>컬럼명</th><th>설명</th></tr>
+    <tr><td>현 미수금</td><td>해당 월 말 기준 총 미수금 잔고</td></tr>
+    <tr><td>연체기준잔고</td><td>현 미수금 − 당월 납기 미달 매출 (이번달잔고) 차감한 금액</td></tr>
+    <tr><td>기준회전일</td><td>SAP 기준 계약 목표 회전일 (거래처별 상이)</td></tr>
+    <tr><td>현 회전일</td><td>실제 채권 회전일 (월별 잔고회전일 파일 기준)</td></tr>
+    <tr><td>지연일수</td><td>현 회전일 − 기준회전일 (누적 지연, 음수=0)</td></tr>
+    <tr><td>기청구누계</td><td>직전 월까지 누적 청구된 금액 합계</td></tr>
+    <tr><td>지체보상금</td><td>이번 달 신규 청구액</td></tr>
+    <tr><td>계산 근거</td><td>연체기준잔고 × 지연일수 × 요율 − 기청구누계 = 지체보상금</td></tr>
+    <tr><td>비고</td><td>청구 (발생) / 정상화 (지연 해소)</td></tr>
+  </table>
+</div>
 
-### 2. 누적 청구 방식 (핵심)
+<!-- 5. 정상화 & 초기화 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge gray">5</span> 정상화 처리</div>
+  <div class="gd-items">
+    <div class="gd-item"><div class="gd-dot" style="background:#78909C"></div><span>지연일수가 0 이하로 떨어지면 → 비고에 <b>"정상화"</b> 표시, 누적값 초기화</span></div>
+    <div class="gd-item"><div class="gd-dot" style="background:#78909C"></div><span>이후 다시 지연 발생하면 0부터 새로 누적 시작</span></div>
+  </div>
+</div>
 
-매월 **새로 늘어난 금액만** 청구합니다. 이미 청구한 금액은 중복 청구하지 않습니다.
-
-```
-이번달 청구액 = max(0,  연체기준잔고 × 지연일수  −  이전 누적 최대값)  × 요율
-```
-
-- `이전 누적 최대값` = 지금까지 발행된 (잔고 × 지연일수) 중 최댓값
-- 잔고가 늘었거나 지연일수가 늘었으면 → 차액만큼 추가 청구
-- 잔고·지연일수 모두 이전과 같거나 줄었으면 → 청구 0
-
----
-
-### 3. 예시 (기준회전일 30일)
-
-| 월 | 현회전일 | 지연일수 | 연체기준잔고 | 잔고×지연 | 전월누적 | **이번달청구** |
-|----|---------|---------|------------|---------|---------|-------------|
-| 6월 | 59 | 29 | 500만 | 1,450만 | 0 | **1,450만×1/1000 = 14,500원** |
-| 7월 | 62 | 32 | 500만 | 1,600만 | 1,450만 | **150만×1/1000 = 1,500원** |
-| 8월 | 62 | 32 | 800만 | 2,560만 | 1,600만 | **960만×1/1000 = 9,600원** |
-| 9월 | 65 | 35 | 800만 | 2,800만 | 2,560만 | **240만×1/1000 = 2,400원** |
-
-> **8월 포인트**: 지연일수는 7월과 같은 32일이지만, **잔고가 500만→800만으로 증가**했으므로 차액(300만×32일)에 대한 금액이 추가 청구됩니다.
-
----
-
-### 4. 테이블 컬럼 설명
-
-| 컬럼명 | 설명 |
-|--------|------|
-| **현 미수금** | 해당 월 말 기준 총 미수금 잔고 |
-| **연체기준잔고** | 현 미수금에서 당월 납기 미달 매출 차감한 금액 |
-| **기준회전일** | SAP 기준 계약 목표 회전일 |
-| **현 회전일** | 실제 회전일 (월별 잔고회전일 파일 기준) |
-| **지연일수** | 현 회전일 − 기준회전일 (누적 지연) |
-| **기청구누계** | 이전 월까지 누적 청구된 금액 |
-| **지체보상금** | 이번 달 신규 청구액 |
-| **계산 근거** | 연체기준잔고 × 지연일수 × 요율 − 기청구누계 = 지체보상금 |
-| **비고** | 청구 / 정상화 (지연 해소) |
-
----
-
-### 5. 정상화 처리
-
-- 지연일수가 0 이하로 떨어지면 → 비고에 **"정상화"** 표시, 누적값 초기화
-- 이후 다시 지연 발생하면 처음부터 다시 누적
-
----
-
-### 6. 사업자번호 매핑 우선순위
-
-1. `think25.xlsx` — 씽크 판매처 코드 기준 (187/187 매핑)
-2. `계약서 파일` — 거래처코드 또는 이름 기준
-3. `ct_biz.xlsx` — 이름 기준 (보조)
+<!-- 6. 사업자번호 -->
+<div class="gd-section">
+  <div class="gd-section-hd"><span class="gd-badge gray">6</span> 사업자번호 매핑 우선순위</div>
+  <div class="gd-rank">
+    <div class="gd-rank-item">
+      <div class="gd-rank-num" style="background:#F57C00">1</div>
+      <span class="gd-tag">think25.xlsx</span>
+      <span style="color:#374151">씽크 판매처 코드 기준 — 187/187 전체 매핑</span>
+    </div>
+    <div class="gd-rank-item">
+      <div class="gd-rank-num" style="background:#78909C">2</div>
+      <span class="gd-tag">계약서 파일</span>
+      <span style="color:#374151">거래처코드 → 이름 순으로 fallback</span>
+    </div>
+    <div class="gd-rank-item">
+      <div class="gd-rank-num" style="background:#B0BEC5">3</div>
+      <span class="gd-tag">ct_biz.xlsx</span>
+      <span style="color:#374151">이름 기반 보조 매핑</span>
+    </div>
+  </div>
+</div>
 
 </div>
 """, unsafe_allow_html=True)
