@@ -924,6 +924,19 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
     sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
     sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
 
+    # 월별 데이터 이름→코드 매핑을 sap_raw에 보완: 기준회전일 2022 파일에 없는 신규 거래처 이름 매칭 지원
+    try:
+        mo_raw = pd.read_excel(io.BytesIO(m_b), dtype=str).dropna(how='all')
+        mo_raw.columns = [str(c).strip() for c in mo_raw.columns]
+        _nc_col = next((c for c in mo_raw.columns if '판매처명' in c or '명칭' in c), None)
+        _cd_col = next((c for c in mo_raw.columns if c == '판매처' or '판매처코드' in c), None)
+        if _nc_col and _cd_col:
+            _extra = mo_raw[[_nc_col, _cd_col]].dropna().copy()
+            _extra.columns = ['판매처명', '판매처']
+            sap_raw = pd.concat([sap_raw, _extra], ignore_index=True).drop_duplicates(subset=['판매처명'])
+    except Exception:
+        pass
+
     # 계약 매핑: Excel 단독 (openpyxl 직접 읽기, recalculate_with_contract.py 동일 로직)
     cmap = {}
     n_yes = n_no = 0
@@ -943,6 +956,27 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
 
     # 월별 데이터: 항상 SAP 파일 사용 (DW07/DW11 채널 모두 포함)
     months = load_monthly(m_b)
+
+    # 기준회전일 미등록 씽크 거래처 보완: cmap 매칭됐지만 2022 기준회전일 파일에 없는 2023+ 신규 거래처
+    if _eff_cmap:
+        bdf_codes = set(bdf["코드"]) if not bdf.empty else set()
+        extra_rows = []; seen_extra = set()
+        for m in months:
+            for _, row in m["data"].iterrows():
+                code = row["코드"]
+                if code in bdf_codes or code in seen_extra: continue
+                info = _eff_cmap.get(code, {})
+                if not info.get("지체여부"): continue
+                rot = (think_rot or {}).get(code, 30)
+                extra_rows.append({
+                    "코드": code, "명칭": row.get("명칭", ""),
+                    "기준회전일": rot, "유효기준회전일": rot,
+                    "지체여부": True, "요율": info.get("요율", 1/1000)
+                })
+                seen_extra.add(code)
+        if extra_rows:
+            bdf = pd.concat([bdf, pd.DataFrame(extra_rows)], ignore_index=True)
+
     org_map = _build_org_map(m_b)
     result = calculate(months, bdf)
     if org_map and not result.empty:
@@ -980,19 +1014,6 @@ with st.spinner("데이터 계산 중..."):
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
-
-# 계약 매핑 디버그 (문제 확인용)
-with st.expander("🔧 계약 매핑 상태 확인", expanded=False):
-    st.write(f"**cmap 크기**: {len(contract_map)}건")
-    if contract_map:
-        sample_keys = list(contract_map.keys())[:5]
-        st.write(f"**cmap 코드 샘플**: {sample_keys}")
-        st.write(f"**cmap 값 샘플**: {[contract_map[k] for k in sample_keys]}")
-    if not result_df.empty:
-        sample_codes = list(result_df["판매처코드"].unique()[:5])
-        st.write(f"**결과 판매처코드 샘플**: {sample_codes}")
-        matched = sum(1 for c in result_df["판매처코드"].unique() if c in contract_map)
-        st.write(f"**cmap 매칭 건수**: {matched} / {result_df['판매처코드'].nunique()}")
 
 months_sorted = sorted(result_df["기준월"].unique())
 mo_sum = result_df.groupby("기준월")["지체보상금"].sum()
