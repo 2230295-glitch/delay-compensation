@@ -1006,8 +1006,9 @@ RAW_PATH  = Path("input/계약정보/raw_thync.xlsx")
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
 # raw_thync.xlsx 제외: CT_LIST에 섞이면 알파벳 순으로 계약서 파일보다 앞서 CT_PATH가 raw 파일을 잡음
 CT_LIST   = [f for f in sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
-             if f.name != "raw_thync.xlsx"]
+             if f.name not in ("raw_thync.xlsx", "ct_biz.xlsx")]
 CT_PATH   = CT_LIST[0] if CT_LIST else None
+CT_BIZ_PATH = Path("input/계약정보/ct_biz.xlsx")  # 보조 사업자번호 소스 (이름 매칭)
 CT_CSV    = Path("input/계약정보/계약_매핑결과.csv")
 
 @st.cache_data(show_spinner=False)
@@ -1037,7 +1038,8 @@ b_b = _read_bytes(str(BASE_PATH))
 c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
 t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 csv_b = CT_CSV.read_bytes() if CT_CSV.exists() else None
-raw_b = _read_bytes(str(RAW_PATH))
+raw_b  = _read_bytes(str(RAW_PATH))
+biz2_b = _read_bytes(str(CT_BIZ_PATH))  # 보조 사업자번호 파일
 
 def _build_org_map(m_b):
     if not m_b: return {}
@@ -1056,10 +1058,10 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v21"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v22"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
+def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, ver=_CALC_VER):
     months = load_monthly(m_b)
     org_map = _build_org_map(m_b)
 
@@ -1091,16 +1093,46 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
              "지체여부": True, "요율": 1/1000}
             for code, info in raw_vendors.items()
         ])
-        # 사업자번호: 계약서 파일 (거래처코드 우선, fallback 정규화 병원명)
+        # 사업자번호: 계약서 파일 (거래처코드 우선) + 보조파일 (이름 매칭)
         biz_map = {}
         if c_b:
             try: biz_map = _load_biz_map(c_b)
             except Exception: pass
+        # 보조 사업자번호 파일 (ct_biz.xlsx) — 이름 기반
+        biz2_name = {}
+        if biz2_b:
+            try:
+                import openpyxl as _xl2
+                _wb2 = _xl2.load_workbook(io.BytesIO(biz2_b), data_only=True, read_only=True)
+                _ws2 = _wb2.active
+                _data_start = 7
+                for _ridx, _row in enumerate(_ws2.iter_rows(min_row=1, max_row=15, values_only=True), 1):
+                    _cells = [str(v or '').strip() for v in _row]
+                    if any('판매처' in c for c in _cells) and any('사업자' in c for c in _cells):
+                        _data_start = _ridx + 1; break
+                def _cb(v):
+                    if v is None: return ''
+                    if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
+                    return str(v).strip()
+                for _row in _ws2.iter_rows(min_row=_data_start, values_only=True):
+                    if not _row or not str(_row[0] or '').strip().isdigit(): continue
+                    _name = _cb(_row[1]); _biz = _cb(_row[3]).replace('-','').split('_')[0]
+                    if _name and _biz: biz2_name[_norm(_name)] = _biz
+                try: _wb2.close()
+                except: pass
+            except Exception: pass
         cmap = {}
         for code, info in raw_vendors.items():
             biz = biz_map.get(code, '')
-            if not biz:  # code 매칭 실패 시 name fallback
+            if not biz:
                 biz = biz_map.get(_norm(info["명칭"]), '')
+            if not biz:  # 보조 파일 이름 매칭
+                nk = _norm(info["명칭"])
+                biz = biz2_name.get(nk, '')
+                if not biz:
+                    for k, b in biz2_name.items():
+                        if len(k) >= 4 and len(nk) >= 4 and (nk in k or k in nk):
+                            biz = b; break
             cmap[code] = {"지체여부": True, "요율": 1/1000,
                           "계약유형": info["계약유형"], "사업자번호": biz}
         n_yes = len(raw_vendors); n_no = 0
@@ -1150,7 +1182,7 @@ if not (m_b and b_b):
     st.stop()
 
 with st.spinner("데이터 계산 중..."):
-    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b, ver=_CALC_VER)
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b, biz2_b=biz2_b, ver=_CALC_VER)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
