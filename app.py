@@ -332,31 +332,51 @@ def load_contract(file_bytes, sap_df):
     except Exception:
         return {}, 0, 0
 
-    # 헤더 행 자동 탐지: 계약서 형식 or raw 파일 형식 둘 다 지원
+    # 헤더 행 자동 탐지: 3가지 형식 지원
+    # 'full'   : 거래처코드 컬럼 있음 (로컬 계약서)
+    # 'summary': 판매처명+계약유형만 있음, 코드 없음 (서버 계약서)
+    # 'raw'    : 실납처 형식
     FIXED = {}
-    fmt = None   # 'contract' | 'raw'
+    fmt = None
     data_start = 12
     for ridx, hrow in enumerate(ws.iter_rows(min_row=1, max_row=30, values_only=True), start=1):
         cells = [str(v or '').replace('\n', '').strip() for v in hrow]
         if any('거래처코드' in c for c in cells):
-            fmt = 'contract'; data_start = ridx + 1
+            fmt = 'full'; data_start = ridx + 1
             for i, c in enumerate(cells):
                 if '거래처코드' in c: FIXED['code'] = i
                 if '계약유형'  in c:  FIXED['type'] = i
-                if '사업자' in c and ('번호' in c or '등록' in c): FIXED['biz'] = i
-                if '지체보상금' in c: FIXED['jiche'] = i
+                if '사업자' in c:     FIXED['biz'] = i
+                if '지체보상금' in c or ('지체' in c and '보상' in c): FIXED['jiche'] = i
                 if ('판매처' in c and '갑' in c) or '병원명' in c: FIXED['name'] = i
             break
         if any(c in ('실납처', '실 납처') for c in cells):
             fmt = 'raw'; data_start = ridx + 1
             for i, c in enumerate(cells):
-                if c in ('실납처', '실 납처'):   FIXED['code'] = i
+                if c in ('실납처', '실 납처'):    FIXED['code'] = i
                 if c in ('실납처명', '실 납처명'): FIXED['name'] = i
-                if c == '유형':                   FIXED['type'] = i
+                if c == '유형':                    FIXED['type'] = i
             break
-    # fallback: 로컬 계약서 Excel 확인값
-    if fmt is None: fmt = 'contract'
-    FIXED.setdefault('code', 2); FIXED.setdefault('name', 9)
+        # 거래처코드 없고 판매처(갑)+계약유형만 있는 요약 형식
+        has_name = any('판매처' in c and '갑' in c for c in cells)
+        has_type = any(c == '계약유형' for c in cells)
+        if has_name and has_type and str(hrow[0] or '').strip() in ('No.', 'No', '번호', '순번'):
+            fmt = 'summary'; data_start = ridx + 1
+            for i, c in enumerate(cells):
+                if '판매처' in c and '갑' in c: FIXED['name'] = i
+                if c == '계약유형':              FIXED['type'] = i
+                if '사업자' in c:               FIXED['biz'] = i
+            FIXED['code'] = -1  # 코드 컬럼 없음 → 이름 매칭 전용
+            # jiche 컬럼: 첫 데이터행에서 '지연' 텍스트 있는 컬럼 탐지
+            for drow in ws.iter_rows(min_row=data_start, max_row=min(data_start+5, ws.max_row), values_only=True):
+                if drow and str(drow[0] or '').strip().isdigit():
+                    for i, v in enumerate(drow):
+                        if v and ('지연' in str(v) or '1일당' in str(v) or '보상금' in str(v)):
+                            FIXED['jiche'] = i; break
+                    break
+            break
+    if fmt is None: fmt = 'full'
+    FIXED.setdefault('code', 2); FIXED.setdefault('name', 1)
     FIXED.setdefault('type', 11); FIXED.setdefault('biz', 12); FIXED.setdefault('jiche', 24)
 
     result = {}
@@ -370,11 +390,14 @@ def load_contract(file_bytes, sap_df):
             if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
             if isinstance(v, int):   return str(v)
             return str(v).strip()
-        code  = _cell(row[FIXED["code"]]) if len(row) > FIXED["code"] else ''
+        _ci = FIXED.get("code", 2)
+        code  = (_cell(row[_ci]) if _ci >= 0 and len(row) > _ci else '')
         name  = _cell(row[FIXED["name"]]) if len(row) > FIXED["name"] else ''
         ctype = _cell(row[FIXED["type"]]) if len(row) > FIXED["type"] else ''
-        biz   = _cell(row[FIXED.get("biz", 12)]) if fmt == 'contract' and len(row) > FIXED.get("biz", 12) else ''
-        y_val = _cell(row[FIXED.get("jiche", 24)]) if fmt == 'contract' and len(row) > FIXED.get("jiche", 24) else ''
+        _bi   = FIXED.get("biz", 12)
+        biz   = _cell(row[_bi]) if _bi >= 0 and len(row) > _bi else ''
+        _ji   = FIXED.get("jiche", 24)
+        y_val = _cell(row[_ji]) if _ji >= 0 and len(row) > _ji else ''
 
         if fmt == 'raw':
             is_yes = True   # raw 파일에 있으면 계약 보유
