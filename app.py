@@ -873,6 +873,49 @@ def make_공문_zip_cumulative(result_df):
             zf.writestr(fname, make_공문_word_cumulative(grp))
     return buf.getvalue()
 
+def load_raw_monthly_sales(file_bytes):
+    """raw 파일 → {(코드, yr, mo): 매출금액} — 당월 매출 제외 계산용"""
+    import openpyxl as _xl
+    try:
+        wb = _xl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+        ws = wb.active
+    except Exception:
+        return {}
+    all_rows = list(ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=True))
+    if len(all_rows) < 4:
+        try: wb.close()
+        except: pass
+        return {}
+    date_row = all_rows[1]  # Excel 2행: YYYY.MM 날짜 헤더
+    date_cols = {}
+    for i, v in enumerate(date_row):
+        s = str(v or '').strip()
+        if len(s) == 7 and s[4] == '.':
+            try: date_cols[(int(s[:4]), int(s[5:]))] = i
+            except: pass
+    result = {}
+    for row in all_rows[3:]:  # Excel 4행부터 데이터
+        if not row or not str(row[0] or '').strip().isdigit(): continue
+        def _code(v):
+            if v is None: return ''
+            if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
+            if isinstance(v, int): return str(v)
+            return str(v).strip()
+        def _amt(v):
+            if v is None: return 0.0
+            if isinstance(v, (int, float)): return float(v)
+            try: return float(str(v).replace(',', '').strip() or 0)
+            except: return 0.0
+        code = _code(row[1])
+        if not code: continue
+        for (yr, mo), ci in date_cols.items():
+            if ci < len(row):
+                amt = _amt(row[ci])
+                if amt: result[(code, yr, mo)] = amt
+    try: wb.close()
+    except: pass
+    return result
+
 def _load_biz_map(file_bytes):
     """계약서 파일 → {정규화 병원명: 사업자번호} (raw 파일 사업자번호 보완용)"""
     import openpyxl as _xl
@@ -991,7 +1034,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v14"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v15"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
@@ -1000,6 +1043,20 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
 
     # ── raw 파일 우선: 거래처코드 직접 포함, 기준회전일·계약유형 정확
     raw_vendors = {}
+    # raw 파일 월별 매출 → 이번달잔고 override (잔고(1∼30) 대신 실제 매출액 사용)
+    if raw_b:
+        try:
+            sales_map = load_raw_monthly_sales(raw_b)
+            if sales_map:
+                for m_data in months:
+                    yr, mo = m_data["yr"], m_data["mo"]
+                    df_m = m_data["data"]
+                    df_m["이번달잔고"] = df_m.apply(
+                        lambda row: sales_map.get((row["코드"], yr, mo), row.get("이번달잔고", 0)),
+                        axis=1
+                    )
+        except Exception:
+            pass
     if raw_b:
         try: raw_vendors = load_raw_vendors(raw_b)
         except Exception: pass
