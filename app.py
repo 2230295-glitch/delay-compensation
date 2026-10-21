@@ -1920,7 +1920,7 @@ with tab_detail:
 # ══════════════════════════════════════════════════════════════
 with tab_guide:
     st.markdown("""
-<div style="max-width:820px;margin:0 auto">
+<div style="max-width:820px;margin:0 auto;background:#fff;border-radius:12px;padding:2rem 2.5rem;box-shadow:0 1px 6px rgba(0,0,0,.07)">
 
 ## 지체보상금 계산 가이드
 
