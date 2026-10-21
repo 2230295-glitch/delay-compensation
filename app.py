@@ -867,9 +867,38 @@ def make_공문_zip_cumulative(result_df):
             zf.writestr(fname, make_공문_word_cumulative(grp))
     return buf.getvalue()
 
+def load_raw_vendors(file_bytes):
+    """raw 씽크 파일 → {코드: {명칭, 기준회전일, 계약유형}} — vendor code 직접 포함"""
+    import openpyxl as _xl
+    wb = _xl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+    ws = wb.active
+    result = {}
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row, values_only=True):
+        if not row or len(row) < 9: continue
+        no_val = str(row[0] or '').strip()
+        if not no_val.isdigit(): continue
+        def _c(v):
+            if v is None: return ''
+            if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
+            if isinstance(v, int): return str(v)
+            return str(v).strip()
+        code = _c(row[1])
+        if not code or code == 'nan': continue
+        name = _c(row[2])
+        유형 = _c(row[5])
+        rot_str = _c(row[8])
+        try: rot = int(''.join(c for c in rot_str if c.isdigit()) or '30')
+        except: rot = 30
+        if rot <= 0: rot = 30
+        result[code] = {'명칭': name, '기준회전일': rot, '계약유형': 유형}
+    try: wb.close()
+    except: pass
+    return result
+
 # ──────────────────────────────────────────────────────────────
 BASE_PATH = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
 MO_FOLDER = Path("input/월별잔고회전일")
+RAW_PATH  = Path("input/계약정보/raw_thync.xlsx")
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
 CT_LIST   = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
 CT_PATH   = CT_LIST[0] if CT_LIST else None
@@ -902,6 +931,7 @@ b_b = _read_bytes(str(BASE_PATH))
 c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
 t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 csv_b = CT_CSV.read_bytes() if CT_CSV.exists() else None
+raw_b = _read_bytes(str(RAW_PATH))
 
 def _build_org_map(m_b):
     if not m_b: return {}
@@ -921,72 +951,50 @@ def _build_org_map(m_b):
     except Exception: return {}
 
 @st.cache_data(show_spinner=False)
-def run_calc(m_b, b_b, c_b, t_b, csv_b=None):
-    sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
-    sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
-
-    # 월별 데이터 이름→코드 매핑을 sap_raw에 보완: 기준회전일 2022 파일에 없는 신규 거래처 이름 매칭 지원
-    try:
-        mo_raw = pd.read_excel(io.BytesIO(m_b), dtype=str).dropna(how='all')
-        mo_raw.columns = [str(c).strip() for c in mo_raw.columns]
-        _nc_col = next((c for c in mo_raw.columns if '판매처명' in c or '명칭' in c), None)
-        _cd_col = next((c for c in mo_raw.columns if c == '판매처' or '판매처코드' in c), None)
-        if _nc_col and _cd_col:
-            _extra = mo_raw[[_nc_col, _cd_col]].dropna().copy()
-            _extra.columns = ['판매처명', '판매처']
-            sap_raw = pd.concat([sap_raw, _extra], ignore_index=True).drop_duplicates(subset=['판매처명'])
-    except Exception:
-        pass
-
-    # 계약 매핑: Excel 단독 (openpyxl 직접 읽기, recalculate_with_contract.py 동일 로직)
-    cmap = {}
-    n_yes = n_no = 0
-    if c_b:
-        try:
-            cmap, n_yes, n_no = load_contract(c_b, sap_raw)
-        except Exception:
-            cmap = {}
-
-    # 기준회전일 (씽크 파일의 회전일 오버라이드 반영)
-    think_rot = load_think(t_b) if t_b else None
-    _eff_cmap = cmap if cmap else None
-    bdf = load_base(b_b, _eff_cmap, think_rot)
-    # cmap이 있는데 매칭된 거래처가 0건이면 fallback (코드 불일치 방어)
-    if _eff_cmap is not None and not bdf.empty and not bdf["지체여부"].any():
-        bdf = load_base(b_b, None, think_rot)
-
-    # 월별 데이터: 항상 SAP 파일 사용 (DW07/DW11 채널 모두 포함)
+def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None):
     months = load_monthly(m_b)
-
-    # 기준회전일 미등록 씽크 거래처 보완: cmap 매칭됐지만 2022 기준회전일 파일에 없는 2023+ 신규 거래처
-    if _eff_cmap:
-        bdf_codes = set(bdf["코드"]) if not bdf.empty else set()
-        extra_rows = []; seen_extra = set()
-        for m in months:
-            for _, row in m["data"].iterrows():
-                code = row["코드"]
-                if code in bdf_codes or code in seen_extra: continue
-                info = _eff_cmap.get(code, {})
-                if not info.get("지체여부"): continue
-                rot = (think_rot or {}).get(code, 30)
-                extra_rows.append({
-                    "코드": code, "명칭": row.get("명칭", ""),
-                    "기준회전일": rot, "유효기준회전일": rot,
-                    "지체여부": True, "요율": info.get("요율", 1/1000)
-                })
-                seen_extra.add(code)
-        if extra_rows:
-            bdf = pd.concat([bdf, pd.DataFrame(extra_rows)], ignore_index=True)
-
     org_map = _build_org_map(m_b)
+
+    # ── raw 파일 우선: 거래처코드 직접 포함, 기준회전일·계약유형 정확
+    raw_vendors = {}
+    if raw_b:
+        try: raw_vendors = load_raw_vendors(raw_b)
+        except Exception: pass
+
+    if raw_vendors:
+        # raw 파일에 있는 거래처만 계산 대상
+        bdf = pd.DataFrame([
+            {"코드": code, "명칭": info["명칭"],
+             "기준회전일": info["기준회전일"], "유효기준회전일": info["기준회전일"],
+             "지체여부": True, "요율": 1/1000}
+            for code, info in raw_vendors.items()
+        ])
+        cmap = {code: {"지체여부": True, "요율": 1/1000,
+                       "계약유형": info["계약유형"], "사업자번호": ""}
+                for code, info in raw_vendors.items()}
+        n_yes = len(raw_vendors); n_no = 0
+    else:
+        # fallback: 기존 SAP + 계약서 로직
+        sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
+        sap_raw.columns = [str(c).strip() for c in sap_raw.columns]
+        cmap = {}; n_yes = n_no = 0
+        if c_b:
+            try: cmap, n_yes, n_no = load_contract(c_b, sap_raw)
+            except Exception: cmap = {}
+        think_rot = load_think(t_b) if t_b else None
+        _eff_cmap = cmap if cmap else None
+        bdf = load_base(b_b, _eff_cmap, think_rot)
+        if _eff_cmap is not None and not bdf.empty and not bdf["지체여부"].any():
+            bdf = load_base(b_b, None, think_rot)
+
     result = calculate(months, bdf)
     if org_map and not result.empty:
         result["사무소"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사무소", ""))
         result["사업부"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("사업부", ""))
         result["담당자"] = result["판매처코드"].map(lambda c: org_map.get(c, {}).get("담당자", ""))
     if cmap and not result.empty:
-        result["계약유형"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("계약유형", ""))
-        result["사업자번호"] = result["판매처코드"].map(lambda c: (cmap or {}).get(c, {}).get("사업자번호", ""))
+        result["계약유형"]  = result["판매처코드"].map(lambda c: cmap.get(c, {}).get("계약유형", ""))
+        result["사업자번호"] = result["판매처코드"].map(lambda c: cmap.get(c, {}).get("사업자번호", ""))
     else:
         if "계약유형"  not in result.columns: result["계약유형"]  = ""
         if "사업자번호" not in result.columns: result["사업자번호"] = ""
@@ -1011,7 +1019,7 @@ if not (m_b and b_b):
     st.stop()
 
 with st.spinner("데이터 계산 중..."):
-    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b)
+    result_df, contract_map, n_yes, n_no = run_calc(m_b, b_b, c_b, t_b, csv_b, raw_b=raw_b)
 
 if result_df is None or result_df.empty:
     st.warning("계산 결과가 없습니다."); st.stop()
