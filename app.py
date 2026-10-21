@@ -447,6 +447,7 @@ def load_base(file_bytes, cmap=None, think_rotations=None):
         if not code or code == "nan" or pd.isna(base) or base <= 0: continue
         eff = (int(exc) if not pd.isna(exc) and exc > 0
                else (int(yak) if not pd.isna(yak) and yak > 0 else int(base)))
+        if eff == 40: eff = 30  # 씽크 계약 표준 30일 적용
         info = (cmap or {}).get(code, {})
         # cmap 제공 시 미등록 거래처는 지체 대상 아님 (계약 없음)
         use = info.get("지체여부", cmap is None); rate = info.get("요율", 1/1000)
