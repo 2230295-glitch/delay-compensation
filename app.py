@@ -917,21 +917,24 @@ def load_raw_monthly_sales(file_bytes):
     return result
 
 def _load_biz_map(file_bytes):
-    """계약서 파일 → {거래처코드: 사업자번호} (코드 직접 매칭, _계약파기/대시 정규화)"""
+    """계약서 파일 → {거래처코드: 사업자번호}
+    거래처코드 컬럼 있으면 코드 직접 매칭, 없으면 판매처명 fallback.
+    _계약파기/대시 정규화, 파기 아닌 계약 우선."""
     import openpyxl as _xl
     try:
         wb = _xl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
         ws = wb['계약서'] if '계약서' in wb.sheetnames else wb.active
     except Exception:
         return {}
-    code_col = biz_col = None; data_start = 12
+    code_col = biz_col = name_col = None; data_start = 12
     for ridx, row in enumerate(ws.iter_rows(min_row=1, max_row=30, values_only=True), 1):
         cells = [str(v or '').strip() for v in row]
         _cc = next((i for i, c in enumerate(cells) if '거래처코드' in c), None)
         _bc = next((i for i, c in enumerate(cells) if '사업자' in c), None)
-        if _cc is not None and _bc is not None:
-            code_col = _cc; biz_col = _bc; data_start = ridx + 1; break
-    if code_col is None:
+        _nc = next((i for i, c in enumerate(cells) if '판매처' in c and '갑' in c), None)
+        if _bc is not None and (_cc is not None or _nc is not None):
+            code_col = _cc; biz_col = _bc; name_col = _nc; data_start = ridx + 1; break
+    if biz_col is None:
         try: wb.close()
         except: pass
         return {}
@@ -939,16 +942,22 @@ def _load_biz_map(file_bytes):
         if v is None: return ''
         if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
         return str(v).strip()
-    temp = {}  # code -> (biz, is_파기)
+    temp = {}  # key -> (biz, is_파기)
     for row in ws.iter_rows(min_row=data_start, max_row=ws.max_row, values_only=True):
         if not row or not str(row[0] or '').strip().isdigit(): continue
-        code = _c(row[code_col]) if len(row) > code_col else ''
-        biz_raw = _c(row[biz_col]) if biz_col is not None and len(row) > biz_col else ''
-        if not code: continue
+        # 키: 거래처코드 우선, 없으면 정규화 병원명
+        if code_col is not None and len(row) > code_col:
+            key = _c(row[code_col])
+        elif name_col is not None and len(row) > name_col:
+            key = _norm(_c(row[name_col]))
+        else:
+            continue
+        if not key: continue
+        biz_raw = _c(row[biz_col]) if len(row) > biz_col else ''
         is_파기 = '_계약파기' in biz_raw
         biz = biz_raw.split('_')[0].replace('-', '').strip()
-        if code not in temp or (not is_파기 and temp[code][1]):
-            temp[code] = (biz, is_파기)
+        if key not in temp or (not is_파기 and temp[key][1]):
+            temp[key] = (biz, is_파기)
     try: wb.close()
     except: pass
     return {k: v[0] for k, v in temp.items()}
@@ -1038,7 +1047,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v17"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v18"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
@@ -1073,7 +1082,7 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
              "지체여부": True, "요율": 1/1000}
             for code, info in raw_vendors.items()
         ])
-        # 사업자번호: 계약서 파일에서 거래처코드 직접 매칭
+        # 사업자번호: 계약서 파일 (거래처코드 우선, fallback 정규화 병원명)
         biz_map = {}
         if c_b:
             try: biz_map = _load_biz_map(c_b)
@@ -1081,6 +1090,8 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, ver=_CALC_VER):
         cmap = {}
         for code, info in raw_vendors.items():
             biz = biz_map.get(code, '')
+            if not biz:  # code 매칭 실패 시 name fallback
+                biz = biz_map.get(_norm(info["명칭"]), '')
             cmap[code] = {"지체여부": True, "요율": 1/1000,
                           "계약유형": info["계약유형"], "사업자번호": biz}
         n_yes = len(raw_vendors); n_no = 0
