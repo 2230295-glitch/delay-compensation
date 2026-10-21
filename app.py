@@ -2099,36 +2099,6 @@ with tab_guide:
   </table>
 </div>
 
-<!-- 5. 정상화 & 초기화 -->
-<div class="gd-section">
-  <div class="gd-section-hd"><span class="gd-badge gray">5</span> 정상화 처리</div>
-  <div class="gd-items">
-    <div class="gd-item"><div class="gd-dot" style="background:#78909C"></div><span>지연일수가 0 이하로 떨어지면 → 비고에 <b>"정상화"</b> 표시, 누적값 초기화</span></div>
-    <div class="gd-item"><div class="gd-dot" style="background:#78909C"></div><span>이후 다시 지연 발생하면 0부터 새로 누적 시작</span></div>
-  </div>
-</div>
-
-<!-- 6. 사업자번호 -->
-<div class="gd-section">
-  <div class="gd-section-hd"><span class="gd-badge gray">6</span> 사업자번호 매핑 우선순위</div>
-  <div class="gd-rank">
-    <div class="gd-rank-item">
-      <div class="gd-rank-num" style="background:#F57C00">1</div>
-      <span class="gd-tag">think25.xlsx</span>
-      <span style="color:#374151">씽크 판매처 코드 기준 — 187/187 전체 매핑</span>
-    </div>
-    <div class="gd-rank-item">
-      <div class="gd-rank-num" style="background:#78909C">2</div>
-      <span class="gd-tag">계약서 파일</span>
-      <span style="color:#374151">거래처코드 → 이름 순으로 fallback</span>
-    </div>
-    <div class="gd-rank-item">
-      <div class="gd-rank-num" style="background:#B0BEC5">3</div>
-      <span class="gd-tag">ct_biz.xlsx</span>
-      <span style="color:#374151">이름 기반 보조 매핑</span>
-    </div>
-  </div>
-</div>
 
 </div>
 """, unsafe_allow_html=True)
