@@ -939,7 +939,9 @@ BASE_PATH = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_07
 MO_FOLDER = Path("input/월별잔고회전일")
 RAW_PATH  = Path("input/계약정보/raw_thync.xlsx")
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
-CT_LIST   = sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
+# raw_thync.xlsx 제외: CT_LIST에 섞이면 알파벳 순으로 계약서 파일보다 앞서 CT_PATH가 raw 파일을 잡음
+CT_LIST   = [f for f in sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
+             if f.name != "raw_thync.xlsx"]
 CT_PATH   = CT_LIST[0] if CT_LIST else None
 CT_CSV    = Path("input/계약정보/계약_매핑결과.csv")
 
