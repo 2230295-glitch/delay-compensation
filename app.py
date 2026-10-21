@@ -590,7 +590,9 @@ def load_monthly(file_bytes, think_codes=None):
 
 def calculate(months, base_df):
     bmap = {r["코드"]: r for _, r in base_df.iterrows()}
-    cum: dict = {}; results = []
+    cum_delay: dict = {}   # 코드별 최대 누적 지연일수
+    cum_bal: dict = {}     # 코드별 직전 연체기준잔고
+    results = []
     for m in months:
         yr, mo = m["yr"], m["mo"]
         for _, row in m["data"].iterrows():
@@ -603,10 +605,18 @@ def calculate(months, base_df):
             현 = row["현회전일"]; 잔 = row["잔고"]
             이번달 = float(row.get("이번달잔고", 0) or 0)
             연체기준잔 = max(0.0, 잔 - 이번달)  # 당월 납기 미도달분 제외
-            지연 = max(0, 현 - 기준); prev = cum.get(code, 0)
-            if 지연 <= 0: cum[code] = 0; 증분 = 0
-            else: 증분 = max(0, 지연 - prev); cum[code] = max(prev, 지연)
-            보상 = round(연체기준잔 * 증분 * 요율) if 증분 > 0 else 0
+            지연 = max(0, 현 - 기준)
+            prev_d = cum_delay.get(code, 0)
+            prev_b = cum_bal.get(code, 0.0)
+            if 지연 <= 0:
+                cum_delay[code] = 0; cum_bal[code] = 0.0
+                신규일수 = 0; 잔고증분 = 0.0; 보상 = 0
+            else:
+                신규일수 = max(0, 지연 - prev_d)
+                잔고증분 = max(0.0, 연체기준잔 - prev_b) if prev_d > 0 else 0.0
+                보상 = round((연체기준잔 * 신규일수 + 잔고증분 * prev_d) * 요율)
+                cum_delay[code] = max(prev_d, 지연)
+                cum_bal[code] = 연체기준잔
             rate_str = f"1/{int(round(1/요율))}" if 요율 > 0 else "-"
             results.append({
                 "기준월":f"{yr}-{mo:02d}","판매처코드":code,"판매처명":row["명칭"],
@@ -614,8 +624,8 @@ def calculate(months, base_df):
                 "사무소":row.get("사무소",""),"사업부":row.get("사업부",""),"담당자":row.get("담당자",""),
                 "현 미수금":int(잔),"연체기준잔고":int(연체기준잔),"기준회전일(SAP)":b["기준회전일"],
                 "유효기준회전일":기준,"현 회전일":현,"지연일수(누적)":지연,
-                "청구 증분일수":증분,"지체보상금":보상,"요율":rate_str,
-                "비고":"청구" if 보상 > 0 else ("정상화" if 지연 == 0 and prev > 0 else ""),
+                "청구 증분일수":신규일수,"잔고 증분":int(잔고증분),"지체보상금":보상,"요율":rate_str,
+                "비고":"청구" if 보상 > 0 else ("정상화" if 지연 == 0 and prev_d > 0 else ""),
             })
     return pd.DataFrame(results)
 
@@ -852,9 +862,15 @@ def make_공문_word_cumulative(vendor_df):
 def make_공문_zip(df, month_label):
     buf = io.BytesIO()
     def _calc_str(r):
-        if r["청구 증분일수"] <= 0: return "—"
+        if r["지체보상금"] <= 0: return "—"
         base = int(r.get("연체기준잔고", r["현 미수금"]))
-        return f'{base:,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
+        신규 = int(r.get("청구 증분일수", 0))
+        증분b = int(r.get("잔고 증분", 0))
+        prev_d = int(r.get("지연일수(누적)", 0)) - 신규
+        parts = []
+        if 신규 > 0: parts.append(f'{base:,}×{신규}일')
+        if 증분b > 0: parts.append(f'{증분b:,}×{prev_d}일')
+        return ' + '.join(parts) + f' × {r["요율"]} = {int(r["지체보상금"]):,}원'
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for _, row in df[df["지체보상금"] > 0].sort_values("지체보상금", ascending=False).iterrows():
             row = row.copy(); row["계산 근거"] = _calc_str(row)
@@ -1061,7 +1077,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v25"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v26"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1832,14 +1848,20 @@ with tab_detail:
     view = view.sort_values("지체보상금", ascending=False).reset_index(drop=True)
 
     def _calc_str(r):
-        if r["청구 증분일수"] <= 0: return "—"
+        if r["지체보상금"] <= 0: return "—"
         base = int(r.get("연체기준잔고", r["현 미수금"]))
-        return f'{base:,} × {int(r["청구 증분일수"])}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
+        신규 = int(r.get("청구 증분일수", 0))
+        증분b = int(r.get("잔고 증분", 0))
+        prev_d = int(r.get("지연일수(누적)", 0)) - 신규
+        parts = []
+        if 신규 > 0: parts.append(f'{base:,}×{신규}일')
+        if 증분b > 0: parts.append(f'{증분b:,}×{prev_d}일')
+        return ' + '.join(parts) + f' × {r["요율"]} = {int(r["지체보상금"]):,}원'
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
     _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","채널",
                  "사업부","사무소","담당자","현 미수금",
-                 "유효기준회전일","현 회전일","지연일수(누적)","청구 증분일수",
+                 "유효기준회전일","현 회전일","지연일수(누적)","청구 증분일수","잔고 증분",
                  "요율","지체보상금","계산 근거","비고"]
     disp = view[[c for c in _all_cols if c in view.columns]]
     disp = disp.rename(columns={"판매처코드": "거래처코드", "채널": "거래채널"})
@@ -1867,7 +1889,8 @@ with tab_detail:
             "유효기준회전일": st.column_config.NumberColumn("기준회전일", width=80),
             "현 회전일":      st.column_config.NumberColumn("현회전일",   width=75),
             "지연일수(누적)": st.column_config.NumberColumn("지연일수",   width=75),
-            "청구 증분일수":   st.column_config.NumberColumn("청구일수",   width=75),
+            "청구 증분일수":   st.column_config.NumberColumn("청구일수",   width=70),
+            "잔고 증분":       st.column_config.NumberColumn("잔고증분",   width=110, format="%,.0f"),
             "요율":           st.column_config.TextColumn("요율",         width=65),
             "지체보상금":     st.column_config.NumberColumn("지체보상금", width=125, format="%,.0f"),
             "계산 근거":      st.column_config.TextColumn("계산 근거",    width=280),
