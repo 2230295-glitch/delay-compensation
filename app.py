@@ -1301,37 +1301,31 @@ with tab_agg:
         _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
                  .sum().reset_index()
                  .sort_values("지체보상금", ascending=False).head(_top_n).reset_index(drop=True))
-        st.markdown(
-            f'<div class="chg-title" style="margin-bottom:.4rem">전 기간 누적 합계 '
-            f'<span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">상위 {_top_n}개사 · 클릭하면 월별 내역 표시</span></div>',
-            unsafe_allow_html=True)
-        st.markdown("""<style>
-.top-btn button {
-    background:#fff; border:1px solid #F0F0F0; border-radius:8px;
-    padding:.35rem .7rem; text-align:left; width:100%;
-    font-size:.84rem; color:#212121; margin-bottom:3px;
-    transition:background .15s;
-}
-.top-btn button:hover { background:#FFF8F1 !important; border-color:#F57C00 !important; }
-.top-btn-sel button { background:#FFF3E0 !important; border-color:#F57C00 !important; font-weight:700 !important; }
-</style>""", unsafe_allow_html=True)
         if "top_sel_code" not in st.session_state:
             st.session_state["top_sel_code"] = None
+        _top_html = ""
         for _i, _row in _top5.iterrows():
             _v = int(_row["지체보상금"])
-            _code = _row["판매처코드"]
-            _is_sel = st.session_state["top_sel_code"] == _code
-            _div_cls = "top-btn-sel" if _is_sel else "top-btn"
-            with st.container():
-                st.markdown(f'<div class="{_div_cls}">', unsafe_allow_html=True)
-                if st.button(
-                    f"{_i+1}.  {_row['판매처명']}   {fmt_won(_v, short=True)}",
-                    key=f"top_btn_{_code}",
-                    use_container_width=True,
-                ):
-                    st.session_state["top_sel_code"] = _code if not _is_sel else None
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+            _is_sel = st.session_state["top_sel_code"] == _row["판매처코드"]
+            _row_style = ' style="background:#FFF3E0;font-weight:700"' if _is_sel else ""
+            _top_html += (f'<div class="chg-row"{_row_style}>'
+                          f'<span class="chg-num">{_i+1}</span>'
+                          f'<span class="chg-name">{_row["판매처명"]}</span>'
+                          f'<span class="chg-amt" style="color:#F57C00">{fmt_won(_v, short=True)}</span>'
+                          f'</div>')
+        _badge = f'<span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">상위 {_top_n}개사</span>'
+        st.markdown(f'<div class="chg-card orange">'
+                    f'<div class="chg-title">전 기간 누적 합계 {_badge}</div>'
+                    f'{_top_html}</div>', unsafe_allow_html=True)
+        _top_codes = [None] + list(_top5["판매처코드"])
+        _top_labels = {None: "—"} | {_row["판매처코드"]: f"{_i+1}번" for _i, _row in _top5.iterrows()}
+        _cur_top = st.session_state.get("top_sel_code")
+        _cur_idx = _top_codes.index(_cur_top) if _cur_top in _top_codes else 0
+        def _on_top_radio():
+            st.session_state["top_sel_code"] = st.session_state["_top_radio_sel"]
+        st.radio("거래처 선택", _top_codes, format_func=lambda x: _top_labels.get(x, "—"),
+                 index=_cur_idx, horizontal=True, key="_top_radio_sel",
+                 on_change=_on_top_radio, label_visibility="collapsed")
 
     with ins2:
         _bu_yr = months_sorted[-1][:4] if months_sorted else cur_yr
