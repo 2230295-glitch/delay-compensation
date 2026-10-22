@@ -603,12 +603,8 @@ def calculate(months, base_df):
             요율 = b["요율"]
             현 = row["현회전일"]; 잔 = row["잔고"]
             이번달 = float(row.get("이번달잔고", 0) or 0)
-            # RAW 기반 연체기준잔고 우선 (Σ매출-Σ수금 - 이번달매출), 없으면 SAP잔고 기반
-            _raw_cb = row.get("_raw_연체기준잔고", None)
-            if _raw_cb is not None and not pd.isna(_raw_cb):
-                연체기준잔 = float(_raw_cb)
-            else:
-                연체기준잔 = max(0.0, 잔 - 이번달)
+            # 연체기준잔고 = SAP순실잔고 - 이번달잔고(1~30) [RAW매출 우선 적용]
+            연체기준잔 = max(0.0, 잔 - 이번달)
             지연 = max(0, 현 - 기준)
             보상 = round(연체기준잔 * 지연 * 요율) if 지연 > 0 else 0
             rate_str = f"1/{int(round(1/요율))}" if 요율 > 0 else "-"
@@ -1071,7 +1067,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v29"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v30"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1086,41 +1082,17 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
         try:
             sales_map = load_raw_monthly_sales(raw_b)
             if sales_map:
-                # 코드별 누적 RAW잔고를 월 순서대로 계산
-                from collections import defaultdict
-                _raw_cum = defaultdict(lambda: {'매출': 0.0, '수금': 0.0})
-                # 전체 월 정렬 (RAW에 있는 월 기준)
-                _raw_months = sorted({(yr, mo) for (_, yr, mo) in sales_map})
-                # (코드, yr, mo) → RAW잔고 (당월 매출 제외한 누적)
-                raw_balance_map = {}  # {(code, yr, mo): 연체기준잔고}
-                raw_sales_map   = {}  # {(code, yr, mo): 이번달매출}
-                # 코드별로 순서대로 누적
-                all_codes = {code for (code, _, _) in sales_map}
-                for code in all_codes:
-                    cum_매출 = 0.0; cum_수금 = 0.0
-                    for yr, mo in _raw_months:
-                        entry = sales_map.get((code, yr, mo), {})
-                        m_sales = entry.get('매출', 0.0)
-                        m_coll  = entry.get('수금', 0.0)
-                        cum_매출 += m_sales; cum_수금 += m_coll
-                        raw_잔고 = max(0.0, cum_매출 - cum_수금)
-                        # 연체기준잔고 = RAW잔고 - 이번달매출 (당월 신규분 제외)
-                        raw_balance_map[(code, yr, mo)] = max(0.0, raw_잔고 - m_sales)
-                        raw_sales_map[(code, yr, mo)]   = m_sales
-
+                # RAW 월별 매출 맵 (코드, yr, mo) → 이번달매출
+                raw_sales_map = {(code, yr, mo): entry.get('매출', 0.0)
+                                 for (code, yr, mo), entry in sales_map.items()}
+                # 이번달잔고: RAW 매출 우선, 없으면 SAP 잔고(1~30) 유지
                 for m_data in months:
                     yr, mo = m_data["yr"], m_data["mo"]
                     df_m = m_data["data"]
-                    # 이번달잔고: RAW에 있으면 RAW 매출, 없으면 SAP 잔고(1~30)
                     df_m["이번달잔고"] = df_m.apply(
-                        lambda row: raw_sales_map.get(
-                            (row["코드"], yr, mo),
+                        lambda row, _yr=yr, _mo=mo: raw_sales_map.get(
+                            (row["코드"], _yr, _mo),
                             float(row.get("이번달잔고", 0) or 0)),
-                        axis=1
-                    )
-                    # RAW기반 연체기준잔고 override (있는 경우만)
-                    df_m["_raw_연체기준잔고"] = df_m.apply(
-                        lambda row: raw_balance_map.get((row["코드"], yr, mo), None),
                         axis=1
                     )
         except Exception:
