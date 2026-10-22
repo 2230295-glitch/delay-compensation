@@ -1009,11 +1009,15 @@ def load_raw_vendors(file_bytes):
 # ──────────────────────────────────────────────────────────────
 BASE_PATH = Path("input/기준회전일/SAP 거래처별 기준회전일_DW11_0722.xlsx")
 MO_FOLDER = Path("input/월별잔고회전일")
-RAW_PATH  = Path("input/계약정보/raw_thync.xlsx")
+# RAW파일: *raw*.xlsx 패턴으로 유연하게 찾기 (파일명 변경 대응)
+_raw_glob = (sorted(Path("input/계약정보").glob("*raw*.xlsx")) +
+             sorted(Path("input/계약정보").glob("*raw*.xls"))) if Path("input/계약정보").exists() else []
+RAW_PATH  = _raw_glob[0] if _raw_glob else None
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
-# raw_thync.xlsx 제외: CT_LIST에 섞이면 알파벳 순으로 계약서 파일보다 앞서 CT_PATH가 raw 파일을 잡음
+# raw파일 동적 제외: CT_LIST에 raw가 섞이지 않도록
+_raw_names = {"ct_biz.xlsx"} | {p.name for p in _raw_glob}
 CT_LIST   = [f for f in sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
-             if f.name not in ("raw_thync.xlsx", "ct_biz.xlsx")]
+             if f.name not in _raw_names]
 CT_PATH   = CT_LIST[0] if CT_LIST else None
 CT_BIZ_PATH   = Path("input/계약정보/ct_biz.xlsx")    # 보조 사업자번호 소스 (이름 매칭)
 THINK25_PATH  = Path("input/계약정보/think25.xlsx")   # 씽크 25년 현황 — 코드 직접 매핑 (187/187)
@@ -1046,7 +1050,7 @@ b_b = _read_bytes(str(BASE_PATH))
 c_b = _read_bytes(str(CT_PATH)) if CT_PATH else None
 t_b = _read_bytes(str(THINK_PATH)) if THINK_PATH else None
 csv_b = CT_CSV.read_bytes() if CT_CSV.exists() else None
-raw_b  = _read_bytes(str(RAW_PATH))
+_raw_local = _read_bytes(str(RAW_PATH)) if RAW_PATH else None
 biz2_b     = _read_bytes(str(CT_BIZ_PATH))   # 보조 사업자번호 파일
 think25_b  = _read_bytes(str(THINK25_PATH))  # 씽크 25년 현황 (코드 직접 매핑)
 
@@ -1233,6 +1237,20 @@ st.markdown(f"""
   </div>
   <div class="hd-badge">thync™ 채널</div>
 </div>""", unsafe_allow_html=True)
+
+# ── RAW 파일 업로더 (사이드바)
+with st.sidebar:
+    st.markdown("#### 📂 RAW 매출/수금 파일")
+    _raw_label = f"현재: {RAW_PATH.name}" if RAW_PATH else "로컬 파일 없음"
+    st.caption(_raw_label)
+    _raw_uploaded = st.file_uploader(
+        "raw*.xlsx 업로드 (업로드 시 우선 적용)", type=["xlsx", "xls"], key="raw_uploader"
+    )
+    if _raw_uploaded:
+        raw_b = _raw_uploaded.read()
+        st.success(f"업로드됨: {_raw_uploaded.name}")
+    else:
+        raw_b = _raw_local
 
 # ── 데이터 계산
 if not (m_b and b_b):
