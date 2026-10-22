@@ -1263,17 +1263,37 @@ with tab_agg:
         _top5 = (result_df.groupby(["판매처코드","판매처명"])["지체보상금"]
                  .sum().reset_index()
                  .sort_values("지체보상금", ascending=False).head(_top_n).reset_index(drop=True))
-        _top_html = ""
+        st.markdown(
+            f'<div class="chg-title" style="margin-bottom:.4rem">전 기간 누적 합계 '
+            f'<span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">상위 {_top_n}개사 · 클릭하면 월별 내역 표시</span></div>',
+            unsafe_allow_html=True)
+        st.markdown("""<style>
+.top-btn button {
+    background:#fff; border:1px solid #F0F0F0; border-radius:8px;
+    padding:.35rem .7rem; text-align:left; width:100%;
+    font-size:.84rem; color:#212121; margin-bottom:3px;
+    transition:background .15s;
+}
+.top-btn button:hover { background:#FFF8F1 !important; border-color:#F57C00 !important; }
+.top-btn-sel button { background:#FFF3E0 !important; border-color:#F57C00 !important; font-weight:700 !important; }
+</style>""", unsafe_allow_html=True)
+        if "top_sel_code" not in st.session_state:
+            st.session_state["top_sel_code"] = None
         for _i, _row in _top5.iterrows():
             _v = int(_row["지체보상금"])
-            _top_html += (f'<div class="chg-row">'
-                          f'<span class="chg-num">{_i+1}</span>'
-                          f'<span class="chg-name">{_row["판매처명"]}</span>'
-                          f'<span class="chg-amt" style="color:#F57C00">{fmt_won(_v, short=True)}</span>'
-                          f'</div>')
-        st.markdown(f'<div class="chg-card orange">'
-                    f'<div class="chg-title">전 기간 누적 합계 <span style="font-size:.71rem;font-weight:400;color:#9E9E9E;margin-left:.35rem">상위 {_top_n}개사</span></div>'
-                    f'{_top_html}</div>', unsafe_allow_html=True)
+            _code = _row["판매처코드"]
+            _is_sel = st.session_state["top_sel_code"] == _code
+            _div_cls = "top-btn-sel" if _is_sel else "top-btn"
+            with st.container():
+                st.markdown(f'<div class="{_div_cls}">', unsafe_allow_html=True)
+                if st.button(
+                    f"{_i+1}.  {_row['판매처명']}   {fmt_won(_v, short=True)}",
+                    key=f"top_btn_{_code}",
+                    use_container_width=True,
+                ):
+                    st.session_state["top_sel_code"] = _code if not _is_sel else None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
     with ins2:
         _bu_yr = months_sorted[-1][:4] if months_sorted else cur_yr
@@ -1339,6 +1359,39 @@ with tab_agg:
                 st.caption("사업부 정보 없음")
         else:
             st.caption("사업부 정보 없음")
+
+    # ── 누적 TOP 클릭 → 월별 내역 패널 ──────────────────────────
+    _tsel = st.session_state.get("top_sel_code")
+    if _tsel:
+        _tsel_name = result_df[result_df["판매처코드"] == _tsel]["판매처명"].iloc[0] \
+                     if not result_df[result_df["판매처코드"] == _tsel].empty else _tsel
+        _tsel_df = (result_df[result_df["판매처코드"] == _tsel]
+                    .sort_values("기준월")[["기준월","지연일수(누적)","연체기준잔고","요율","지체보상금"]])
+        _total_amt = int(_tsel_df["지체보상금"].sum())
+        st.markdown(
+            f'<div style="background:#FFF8F1;border:1px solid #F57C00;border-radius:12px;'
+            f'padding:.9rem 1.2rem .5rem;margin:.6rem 0 .8rem">'
+            f'<span style="font-size:.9rem;font-weight:700;color:#E65100">{_tsel_name}</span>'
+            f'<span style="font-size:.8rem;color:#64748b;margin-left:.6rem">월별 지체보상금 내역</span>'
+            f'<span style="font-size:.85rem;font-weight:700;color:#E65100;float:right">합계 {_total_amt:,}원</span>'
+            f'</div>', unsafe_allow_html=True)
+        _mo_cols = st.columns(min(len(_tsel_df), 6))
+        for _ci, (_, _mr) in enumerate(_tsel_df.iterrows()):
+            with _mo_cols[_ci % len(_mo_cols)]:
+                _amt = int(_mr["지체보상금"])
+                _days = int(_mr["지연일수(누적)"])
+                _잔 = int(_mr.get("연체기준잔고", 0))
+                _color = "#E65100" if _amt > 0 else "#94a3b8"
+                _bg = "#FFF8F1" if _amt > 0 else "#f8fafc"
+                _border = "#F57C00" if _amt > 0 else "#e2e8f0"
+                st.markdown(
+                    f'<div style="background:{_bg};border:1px solid {_border};border-radius:9px;'
+                    f'padding:.65rem .8rem;text-align:center;margin-bottom:6px">'
+                    f'<div style="font-size:.75rem;color:#64748b;font-weight:600">{_mr["기준월"]}</div>'
+                    f'<div style="font-size:1rem;font-weight:800;color:{_color};margin:.25rem 0">{_amt:,}원</div>'
+                    f'<div style="font-size:.7rem;color:#94a3b8">지연 <b style="color:#475569">{_days}일</b>'
+                    f' · {_잔/1e4:.0f}만</div>'
+                    f'</div>', unsafe_allow_html=True)
 
     col_tbl, col_chart = st.columns([1, 1], gap="large")
 
