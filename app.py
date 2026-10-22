@@ -557,8 +557,9 @@ def load_monthly(file_bytes, think_codes=None):
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     # 씽크 채널: 2025년 이전 데이터 제외 (12월 매출 → 납기 미도달, 지체보상금 구조적 불가)
     df = df[df["_yr"] >= 2025]
-    # DW07은 2025년까지만 씽크 채널 (2026년부터 DW07은 씽크 아님 → 제외)
-    df = df[~((df["채널"] == "DW07") & (df["_yr"] >= 2026))]
+    # DW07은 2026년부터 씽크 신규 매출 없음 → 이번달잔고=0 강제 (잔고(1~30) 버킷에 비씽크 매출 혼입 방지)
+    dw07_2026 = (df["채널"] == "DW07") & (df["_yr"] >= 2026)
+    df.loc[dw07_2026, "_이번달잔고"] = 0.0
     if think_codes and "채널" in df.columns:
         dw07_mask = df["채널"] == "DW07"
         df = df[~dw07_mask | df["판매처"].isin(think_codes)]
@@ -1059,7 +1060,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v27"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v28"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
