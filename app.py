@@ -1914,11 +1914,14 @@ with tab_detail:
 
             st.markdown("---")
             st.markdown(
-                f'<div style="font-size:.85rem;font-weight:700;color:#1e293b;margin:.2rem 0 .6rem">'
-                f'📊 {_name} · 직전 3개월 지체보상금 내역</div>',
+                f'<div style="font-size:.85rem;font-weight:700;color:#1e293b;margin:.2rem 0 .5rem">'
+                f'📊 {_name} · 직전 3개월 지체보상금 내역'
+                f'<span style="font-size:.75rem;color:#64748b;font-weight:400;margin-left:.5rem">'
+                f'청구할 월 선택 후 공문 다운로드</span></div>',
                 unsafe_allow_html=True)
 
             _hcols = st.columns(3)
+            _checked_months = []
             for ci, pm in enumerate(_prev_months):
                 with _hcols[ci]:
                     _row = _hist_df[_hist_df["기준월"] == pm]
@@ -1944,18 +1947,26 @@ with tab_detail:
                             f'<div style="font-size:.75rem;color:#94a3b8">지연 <b style="color:#475569">{_days}일</b></div>'
                             f'</div>',
                             unsafe_allow_html=True)
+                        if _amt > 0:
+                            _cb = st.checkbox(pm, key=f"chk_{_code}_{pm}", value=True)
+                            if _cb:
+                                _checked_months.append(pm)
 
-            _hist_charge = _hist_df[_hist_df["지체보상금"] > 0]
-            if not _hist_charge.empty:
-                _prev_label = ", ".join(_hist_charge["기준월"].tolist())
-                st.markdown('<div style="margin-top:.5rem"></div>', unsafe_allow_html=True)
+            _sel_hist = _hist_df[_hist_df["기준월"].isin(_checked_months)]
+            if not _sel_hist.empty:
+                _sel_label = ", ".join(_sel_hist["기준월"].tolist())
+                st.markdown('<div style="margin-top:.4rem"></div>', unsafe_allow_html=True)
                 st.download_button(
-                    f"📋 직전 3개월 공문 다운로드 ({_prev_label})",
-                    data=make_공문_zip_cumulative(_hist_charge),
-                    file_name=f"지체보상금_{_code}_직전3개월_{date.today():%Y%m%d}.zip",
+                    f"📋 선택 월 공문 다운로드 ({_sel_label})",
+                    data=make_공문_zip_cumulative(_sel_hist),
+                    file_name=f"지체보상금_{_code}_선택_{date.today():%Y%m%d}.zip",
                     mime="application/zip",
                     use_container_width=True,
-                    key="btn_hist_3mo")
+                    key="btn_hist_sel")
+            elif _checked_months == [] and any(not _hist_df[_hist_df["기준월"] == pm].empty
+                                               and int(_hist_df[_hist_df["기준월"] == pm].iloc[0]["지체보상금"]) > 0
+                                               for pm in _prev_months):
+                st.caption("월을 선택하면 공문 다운로드 버튼이 표시됩니다")
     else:
         st.caption("행을 클릭하면 선택 → 공문 다운로드 버튼이 표시됩니다")
 
