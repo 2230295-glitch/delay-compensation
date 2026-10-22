@@ -556,18 +556,19 @@ def load_monthly(file_bytes, think_codes=None):
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     df = df[df["_yr"] >= 2025]
-    # DW07은 씽크 거래처(think_codes)만, DW11은 전체 허용
-    if think_codes and "채널" in df.columns:
-        dw07_mask = df["채널"] == "DW07"
-        df = df[~dw07_mask | df["판매처"].isin(think_codes)]
+    # 채널 기준: 2025년=DW07(씽크 이전 채널), 2026년+=DW11(씽크 현재 채널)
+    if "채널" in df.columns:
+        df = df[((df["채널"] == "DW07") & (df["_yr"] <= 2025)) |
+                ((df["채널"] == "DW11") & (df["_yr"] >= 2026))]
+        if think_codes:
+            dw07_mask = df["채널"] == "DW07"
+            df = df[~dw07_mask | df["판매처"].isin(think_codes)]
     if "담당자"   in df.columns: df = df[~df["담당자"].isin(EXCLUDE_MGR)]
     if "사업부명" in df.columns: df = df[~df["사업부명"].apply(lambda x: any(k in str(x) for k in EXCLUDE_BU))]
     df = df[~df["판매처"].isin(EXCLUDE_CODES)]
     if "사무소명" in df.columns: df = df[~df["사무소명"].isin(EXCLUDE_OFFICE)]
-    # 같은 거래처·채널·년월 중복 제거 후, DW07+DW11 채널이 공존하면 거래처·년월 기준 합산
+    # 여러 파일 합산 시 같은 거래처·채널·년월 중복 제거 (마지막 파일 값 우선)
     df = df.drop_duplicates(subset=["년월", "판매처", "채널"], keep="last")
-    meta_cols = {c: "last" for c in ["판매처명","사무소명","사업부명","담당자명","_일수"] if c in df.columns}
-    df = df.groupby(["판매처", "_yr", "_mo"], as_index=False).agg({"_잔고":"sum","_이번달잔고":"sum", **meta_cols})
     months = []
     for (yr, mo), grp in df.groupby(["_yr","_mo"]):
         def _nc(v):
@@ -577,8 +578,8 @@ def load_monthly(file_bytes, think_codes=None):
                 except: pass
             return s
         rows = [{"연":int(yr),"월":int(mo),"코드":_nc(r["판매처"]),
-                 "명칭":str(r.get("판매처명","")).strip(),"채널":"씽크",
-                 "잔고":r["_잔고"],"현회전일":r.get("_일수", 0),
+                 "명칭":str(r.get("판매처명","")).strip(),"채널":str(r.get("채널","")).strip(),
+                 "잔고":r["_잔고"],"현회전일":r["_일수"],
                  "이번달잔고": float(r.get("_이번달잔고", 0) or 0),
                  "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
                  "사업부":str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
@@ -1066,7 +1067,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v38"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v39"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
