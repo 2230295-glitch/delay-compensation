@@ -1362,7 +1362,7 @@ with tab_agg:
             "청구 건수": int(agg_df["청구 건수"].sum()),
             "지체보상금 (원)": int(agg_df["지체보상금 (원)"].sum()),
         }])
-        agg_display = pd.concat([agg_df, sum_row], ignore_index=True)
+        agg_display = pd.concat([sum_row, agg_df], ignore_index=True)
 
         def _agg_style(row):
             if row["기준월"] == "▶ 합계":
