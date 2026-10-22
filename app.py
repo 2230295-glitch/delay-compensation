@@ -1067,7 +1067,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v36"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v37"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1089,14 +1089,15 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                         e = sales_map.get((code, yr, mo), {})
                         cum_s += e.get('매출', 0.0); cum_c += e.get('수금', 0.0)
                         raw_balance_map[(code, yr, mo)] = max(0.0, cum_s - cum_c)
-                # 잔고 = RAW잔고 우선, 없으면 SAP잔고 (RAW가 씽크 전용으로 채널 혼입 없음)
+                # 잔고 = min(RAW잔고, SAP잔고) — RAW 누락수금은 SAP로, SAP 채널오기입은 RAW로 보정
                 for m_data in months:
                     yr, mo = m_data["yr"], m_data["mo"]
                     df_m = m_data["data"]
                     df_m["잔고"] = df_m.apply(
-                        lambda row, _yr=yr, _mo=mo:
+                        lambda row, _yr=yr, _mo=mo: min(
+                            row["잔고"],
                             raw_balance_map.get((row["코드"], _yr, _mo), row["잔고"])
-                        , axis=1)
+                        ), axis=1)
         except Exception:
             pass
         try: raw_vendors = load_raw_vendors(raw_b)
