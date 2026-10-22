@@ -555,11 +555,11 @@ def load_monthly(file_bytes, think_codes=None):
     df["_이번달잔고"] = df[_col_1_30].apply(_num).fillna(0) if _col_1_30 else 0
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
-    # 씽크 채널: 2025년 이전 데이터 제외 (12월 매출 → 납기 미도달, 지체보상금 구조적 불가)
     df = df[df["_yr"] >= 2025]
-    # DW07: 2026년부터 씽크 DW11로 이동 → 2026+ DW07 행 제외
+    # 채널 기준: 2025년=DW07(씽크 이전 채널), 2026년+=DW11(씽크 현재 채널)
     if "채널" in df.columns:
-        df = df[~((df["채널"] == "DW07") & (df["_yr"] >= 2026))]
+        df = df[((df["채널"] == "DW07") & (df["_yr"] <= 2025)) |
+                ((df["채널"] == "DW11") & (df["_yr"] >= 2026))]
         if think_codes:
             dw07_mask = df["채널"] == "DW07"
             df = df[~dw07_mask | df["판매처"].isin(think_codes)]
@@ -1067,7 +1067,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v35"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v36"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1089,15 +1089,14 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                         e = sales_map.get((code, yr, mo), {})
                         cum_s += e.get('매출', 0.0); cum_c += e.get('수금', 0.0)
                         raw_balance_map[(code, yr, mo)] = max(0.0, cum_s - cum_c)
-                # 잔고 = min(RAW잔고, SAP DW11잔고) — 두 값 중 보수적(낮은) 값 사용
+                # 잔고 = RAW잔고 우선, 없으면 SAP잔고 (RAW가 씽크 전용으로 채널 혼입 없음)
                 for m_data in months:
                     yr, mo = m_data["yr"], m_data["mo"]
                     df_m = m_data["data"]
                     df_m["잔고"] = df_m.apply(
-                        lambda row, _yr=yr, _mo=mo: min(
-                            row["잔고"],
+                        lambda row, _yr=yr, _mo=mo:
                             raw_balance_map.get((row["코드"], _yr, _mo), row["잔고"])
-                        ), axis=1)
+                        , axis=1)
         except Exception:
             pass
         try: raw_vendors = load_raw_vendors(raw_b)
