@@ -282,7 +282,7 @@ button[kind="secondary"]:hover {
 </style>""", unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
-ALLOW_CH       = {"DW07","DW11"}   # 씽크(DW11) + 오프라인(DW07) 만 대상
+ALLOW_CH       = {"DW11"}          # 씽크 채널 DW11만 대상 (DW07은 2025 이전 채널)
 EXCLUDE_CODES  = {"10014461","C4900","C2000","C3100"}
 EXCLUDE_BU     = {"기타사업부","수탁사업부","완제사업부"}
 EXCLUDE_OFFICE = {"DW_B2B","DW_CH신사업팀"}
@@ -557,12 +557,8 @@ def load_monthly(file_bytes, think_codes=None):
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     # 씽크 채널: 2025년 이전 데이터 제외 (12월 매출 → 납기 미도달, 지체보상금 구조적 불가)
     df = df[df["_yr"] >= 2025]
-    # DW07: 2026년부터 씽크 DW11로 이동 → 2026+ DW07 행 완전 제외
-    if "채널" in df.columns:
-        df = df[~((df["채널"] == "DW07") & (df["_yr"] >= 2026))]
-        if think_codes:
-            dw07_mask = df["채널"] == "DW07"
-            df = df[~dw07_mask | df["판매처"].isin(think_codes)]
+    if think_codes and "채널" in df.columns:
+        df = df[df["판매처"].isin(think_codes)]
     if "담당자"   in df.columns: df = df[~df["담당자"].isin(EXCLUDE_MGR)]
     if "사업부명" in df.columns: df = df[~df["사업부명"].apply(lambda x: any(k in str(x) for k in EXCLUDE_BU))]
     df = df[~df["판매처"].isin(EXCLUDE_CODES)]
@@ -1067,7 +1063,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v33"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v34"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
