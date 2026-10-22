@@ -1067,7 +1067,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v30"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v31"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1078,25 +1078,7 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
     raw_vendors = {}; sales_map = {}
     # raw 파일 월별 매출/수금 → RAW잔고 기반 연체기준잔고 계산
     # RAW잔고(M) = Σ매출(~M) - Σ수금(~M),  연체기준잔고(M) = RAW잔고(M) - 이번달매출(M)
-    if raw_b:
-        try:
-            sales_map = load_raw_monthly_sales(raw_b)
-            if sales_map:
-                # RAW 월별 매출 맵 (코드, yr, mo) → 이번달매출
-                raw_sales_map = {(code, yr, mo): entry.get('매출', 0.0)
-                                 for (code, yr, mo), entry in sales_map.items()}
-                # 이번달잔고: RAW 매출 우선, 없으면 SAP 잔고(1~30) 유지
-                for m_data in months:
-                    yr, mo = m_data["yr"], m_data["mo"]
-                    df_m = m_data["data"]
-                    df_m["이번달잔고"] = df_m.apply(
-                        lambda row, _yr=yr, _mo=mo: raw_sales_map.get(
-                            (row["코드"], _yr, _mo),
-                            float(row.get("이번달잔고", 0) or 0)),
-                        axis=1
-                    )
-        except Exception:
-            pass
+    # RAW파일은 거래처 식별(load_raw_vendors)에만 사용; 잔고 계산은 SAP DW11 기준
     if raw_b:
         try: raw_vendors = load_raw_vendors(raw_b)
         except Exception: pass
