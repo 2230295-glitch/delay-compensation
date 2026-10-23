@@ -983,7 +983,8 @@ def load_raw_vendors(file_bytes):
     for row in ws.iter_rows(min_row=4, max_row=ws.max_row, values_only=True):
         if not row or len(row) < 9: continue
         no_val = str(row[0] or '').strip()
-        if not no_val.isdigit(): continue
+        # '47-1' 같은 분할 번호 허용 (숫자 또는 숫자-숫자 형식)
+        if not (no_val.isdigit() or (no_val.replace('-','').isdigit() and no_val.count('-') == 1)): continue
         def _c(v):
             if v is None: return ''
             if isinstance(v, float): return str(int(v)) if v == int(v) else str(v)
@@ -1067,7 +1068,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v39"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v40"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
