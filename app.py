@@ -1024,7 +1024,7 @@ _raw_glob = (sorted(Path("input/계약정보").glob("*raw*.xlsx")) +
 RAW_PATH  = _raw_glob[0] if _raw_glob else None
 THINK_PATH = next(iter(sorted(Path("input").glob("씽크*.xlsx")) + sorted(Path("input").glob("씽크*.XLSX"))), None)
 # raw파일 동적 제외: CT_LIST에 raw가 섞이지 않도록
-_raw_names = {"ct_biz.xlsx"} | {p.name for p in _raw_glob}
+_raw_names = {"ct_biz.xlsx", "think25.xlsx"} | {p.name for p in _raw_glob}
 CT_LIST   = [f for f in sorted(Path("input/계약정보").glob("*.xlsx")) + sorted(Path("input/계약정보").glob("*.xls"))
              if f.name not in _raw_names]
 CT_PATH   = CT_LIST[0] if CT_LIST else None
@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v44"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v45"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
