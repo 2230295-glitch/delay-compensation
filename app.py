@@ -1245,6 +1245,7 @@ st.markdown(f"""
 
 # ── RAW 파일 업로더 (사이드바)
 with st.sidebar:
+    st.caption(f"앱 버전: {_CALC_VER}")
     st.markdown("#### 📂 RAW 매출/수금 파일")
     _raw_label = f"현재: {RAW_PATH.name}" if RAW_PATH else "로컬 파일 없음"
     st.caption(_raw_label)
