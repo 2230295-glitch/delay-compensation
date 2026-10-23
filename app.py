@@ -553,6 +553,16 @@ def load_monthly(file_bytes, think_codes=None):
     # 당월 발생 미수금(납기 미도달): 잔고(1∼30) 버킷 — 지체보상금 기준 제외 대상
     _col_1_30 = next((c for c in df.columns if '잔고(1' in c and '30' in c), None)
     df["_이번달잔고"] = df[_col_1_30].apply(_num).fillna(0) if _col_1_30 else 0
+    # 약정회전일: SAP monthly 파일의 약정회전일 컬럼 → 기준회전일 override로 사용
+    _col_약정 = next((c for c in df.columns if '약정회전일' in c), None)
+    if _col_약정:
+        def _parse_약정(v):
+            s = str(v or '').strip()
+            digits = ''.join(c for c in s if c.isdigit())
+            return int(digits) if digits else 0
+        df["_약정회전일"] = df[_col_약정].apply(_parse_약정)
+    else:
+        df["_약정회전일"] = 0
     df = df[df["판매처"].notna() & (df["판매처"].str.strip() != "") & (df["판매처"] != "nan")]
     df = df[df["채널"].isin(ALLOW_CH)]; df = df[df["_잔고"] != 0]
     df = df[df["_yr"] >= 2025]
@@ -581,6 +591,7 @@ def load_monthly(file_bytes, think_codes=None):
                  "명칭":str(r.get("판매처명","")).strip(),"채널":str(r.get("채널","")).strip(),
                  "잔고":r["_잔고"],"현회전일":r["_일수"],
                  "이번달잔고": float(r.get("_이번달잔고", 0) or 0),
+                 "_기준회전일_override": int(r.get("_약정회전일", 0) or 0) or None,
                  "사무소":str(r.get("사무소명","")).strip() if "사무소명" in r.index else "",
                  "사업부":str(r.get("사업부명","")).strip() if "사업부명" in r.index else "",
                  "담당자":str(r.get("담당자명","")).strip() if "담당자명" in r.index else "",
@@ -1069,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v41"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v42"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
