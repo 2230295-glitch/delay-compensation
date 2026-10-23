@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v43"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v44"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1185,10 +1185,13 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                     for k, b in biz2_name.items():
                         if len(k) >= 4 and len(nk) >= 4 and (nk in k or k in nk):
                             biz = b; break
-            # 계약파일 기준 지체여부·요율 (없으면 기본값 True/0.001)
-            ct_info = ct_cmap.get(code, {})
-            is_yes = ct_info.get("지체여부", True)
-            rate   = ct_info.get("요율", 1/1000)
+            # 계약파일 로드됐는데 없으면 → 제외(False). 계약파일 자체가 없으면 기본 포함
+            if ct_cmap:
+                ct_info = ct_cmap.get(code, {})
+                is_yes = ct_info.get("지체여부", False)
+                rate   = ct_info.get("요율", 1/1000)
+            else:
+                is_yes = True; rate = 1/1000
             cmap[code] = {"지체여부": is_yes, "요율": rate,
                           "계약유형": info["계약유형"], "사업자번호": biz}
         n_yes = sum(1 for v in cmap.values() if v["지체여부"])
