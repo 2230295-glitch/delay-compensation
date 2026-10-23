@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v47"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v48"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1185,10 +1185,13 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                     for k, b in biz2_name.items():
                         if len(k) >= 4 and len(nk) >= 4 and (nk in k or k in nk):
                             biz = b; break
-            # 계약조항 O/X 표시용 (필터링 아님, 정보 표시만)
+            # 계약조항 O/X: ct_cmap에 있고 명시적으로 False인 경우만 X, 없으면 O
             ct_info = ct_cmap.get(code, {})
-            has_clause = ct_info.get("지체여부", False) if ct_cmap else True
-            rate = ct_info.get("요율", 1/1000) if ct_cmap else 1/1000
+            if code in ct_cmap:
+                has_clause = ct_info.get("지체여부", True)
+                rate = ct_info.get("요율", 1/1000)
+            else:
+                has_clause = True; rate = 1/1000
             cmap[code] = {"지체여부": True, "요율": rate, "계약조항": has_clause,
                           "계약유형": info["계약유형"], "사업자번호": biz}
         n_yes = len(raw_vendors); n_no = 0
