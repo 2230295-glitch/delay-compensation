@@ -916,7 +916,8 @@ def load_raw_monthly_sales(file_bytes):
         except: return 0.0
     result = {}
     for row in all_rows[3:]:  # Excel 4행부터 데이터
-        if not row or not str(row[0] or '').strip().isdigit(): continue
+        no_v = str(row[0] or '').strip() if row else ''
+        if not (no_v.isdigit() or (no_v.replace('-','').isdigit() and no_v.count('-')==1)): continue
         code = _code(row[1])
         if not code: continue
         for (yr, mo), ci in date_cols.items():
@@ -1068,7 +1069,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v40"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v41"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
