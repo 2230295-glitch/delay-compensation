@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v42"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v43"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1116,13 +1116,17 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
         except Exception: pass
 
     if raw_vendors:
-        # raw 파일에 있는 거래처만 계산 대상
-        bdf = pd.DataFrame([
-            {"코드": code, "명칭": info["명칭"],
-             "기준회전일": info["기준회전일"], "유효기준회전일": info["기준회전일"],
-             "지체여부": True, "요율": 1/1000}
-            for code, info in raw_vendors.items()
-        ])
+        # 계약파일에서 지체여부·요율 확인 (씽크 모드에도 적용)
+        ct_cmap = {}
+        if c_b:
+            try:
+                _raw_sap_df = pd.DataFrame([
+                    {'판매처': code, '판매처명': info['명칭']}
+                    for code, info in raw_vendors.items()
+                ])
+                ct_cmap, _, _ = load_contract(c_b, _raw_sap_df)
+            except Exception:
+                ct_cmap = {}
         # 사업자번호: think25.xlsx (코드 직접) → 계약서 파일 → 보조파일 (이름 매칭)
         # 1) think25.xlsx — 판매처(col4) + 사업자번호(col3), 187/187 커버
         think25_code_map = {}
@@ -1181,9 +1185,21 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                     for k, b in biz2_name.items():
                         if len(k) >= 4 and len(nk) >= 4 and (nk in k or k in nk):
                             biz = b; break
-            cmap[code] = {"지체여부": True, "요율": 1/1000,
+            # 계약파일 기준 지체여부·요율 (없으면 기본값 True/0.001)
+            ct_info = ct_cmap.get(code, {})
+            is_yes = ct_info.get("지체여부", True)
+            rate   = ct_info.get("요율", 1/1000)
+            cmap[code] = {"지체여부": is_yes, "요율": rate,
                           "계약유형": info["계약유형"], "사업자번호": biz}
-        n_yes = len(raw_vendors); n_no = 0
+        n_yes = sum(1 for v in cmap.values() if v["지체여부"])
+        n_no  = len(cmap) - n_yes
+        # bdf: cmap 기반 지체여부·요율 반영
+        bdf = pd.DataFrame([
+            {"코드": code, "명칭": info["명칭"],
+             "기준회전일": info["기준회전일"], "유효기준회전일": info["기준회전일"],
+             "지체여부": cmap[code]["지체여부"], "요율": cmap[code]["요율"]}
+            for code, info in raw_vendors.items()
+        ])
     else:
         # fallback: 기존 SAP + 계약서 로직
         sap_raw = pd.read_excel(io.BytesIO(b_b), dtype=str).dropna(how="all")
