@@ -417,12 +417,12 @@ def load_contract(file_bytes, sap_df):
                         code = sc; break
 
         if not code or code == 'nan': continue
-        if code not in result or not result[code]["지체여부"]:
-            result[code] = {
-                "지체여부": is_yes, "요율": rate,
-                "계약유형":  ctype if ctype not in ('nan','') else '',
-                "사업자번호": biz   if biz   not in ('nan','') else '',
-            }
+        # 나중 계약이 현재 유효 계약 → 무조건 덮어씀 (No. 순서 = 최신 계약 우선)
+        result[code] = {
+            "지체여부": is_yes, "요율": rate,
+            "계약유형":  ctype if ctype not in ('nan','') else '',
+            "사업자번호": biz   if biz   not in ('nan','') else '',
+        }
 
     try: wb.close()
     except: pass
@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v46"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v47"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
