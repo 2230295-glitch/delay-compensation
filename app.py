@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v45"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v46"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1185,22 +1185,18 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                     for k, b in biz2_name.items():
                         if len(k) >= 4 and len(nk) >= 4 and (nk in k or k in nk):
                             biz = b; break
-            # 계약파일 로드됐는데 없으면 → 제외(False). 계약파일 자체가 없으면 기본 포함
-            if ct_cmap:
-                ct_info = ct_cmap.get(code, {})
-                is_yes = ct_info.get("지체여부", False)
-                rate   = ct_info.get("요율", 1/1000)
-            else:
-                is_yes = True; rate = 1/1000
-            cmap[code] = {"지체여부": is_yes, "요율": rate,
+            # 계약조항 O/X 표시용 (필터링 아님, 정보 표시만)
+            ct_info = ct_cmap.get(code, {})
+            has_clause = ct_info.get("지체여부", False) if ct_cmap else True
+            rate = ct_info.get("요율", 1/1000) if ct_cmap else 1/1000
+            cmap[code] = {"지체여부": True, "요율": rate, "계약조항": has_clause,
                           "계약유형": info["계약유형"], "사업자번호": biz}
-        n_yes = sum(1 for v in cmap.values() if v["지체여부"])
-        n_no  = len(cmap) - n_yes
-        # bdf: cmap 기반 지체여부·요율 반영
+        n_yes = len(raw_vendors); n_no = 0
+        # bdf: 모든 거래처 계산 대상 (지체여부 필터링 없음)
         bdf = pd.DataFrame([
             {"코드": code, "명칭": info["명칭"],
              "기준회전일": info["기준회전일"], "유효기준회전일": info["기준회전일"],
-             "지체여부": cmap[code]["지체여부"], "요율": cmap[code]["요율"]}
+             "지체여부": True, "요율": cmap[code]["요율"]}
             for code, info in raw_vendors.items()
         ])
     else:
@@ -1225,6 +1221,7 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
     if cmap and not result.empty:
         result["계약유형"]  = result["판매처코드"].map(lambda c: cmap.get(c, {}).get("계약유형", ""))
         result["사업자번호"] = result["판매처코드"].map(lambda c: cmap.get(c, {}).get("사업자번호", ""))
+        result["계약조항"]  = result["판매처코드"].map(lambda c: "O" if cmap.get(c, {}).get("계약조항", True) else "X")
     else:
         if "계약유형"  not in result.columns: result["계약유형"]  = ""
         if "사업자번호" not in result.columns: result["사업자번호"] = ""
@@ -1945,7 +1942,7 @@ with tab_detail:
         return f'{base:,} × {지연}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","채널",
+    _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","계약조항","채널",
                  "사업부","사무소","담당자","현 미수금",
                  "유효기준회전일","현 회전일","지연일수(누적)",
                  "요율","지체보상금","계산 근거","비고"]
@@ -1967,6 +1964,7 @@ with tab_detail:
             "판매처명":       st.column_config.TextColumn("거래처명",     width=210),
             "사업자번호":     st.column_config.TextColumn("사업자번호",   width=115),
             "계약유형":       st.column_config.TextColumn("계약유형",     width=110),
+            "계약조항":       st.column_config.TextColumn("조항",         width=50),
             "거래채널":       st.column_config.TextColumn("채널",         width=75),
             "사업부":         st.column_config.TextColumn("사업부",       width=145),
             "사무소":         st.column_config.TextColumn("사무소",       width=130),
