@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v50"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v51"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -2002,7 +2002,7 @@ with tab_detail:
         return f'{base:,} × {지연}일 × {r["요율"]} = {int(r["지체보상금"]):,}원'
     view["계산 근거"] = view.apply(_calc_str, axis=1)
 
-    _all_cols = ["판매처코드","판매처명","사업자번호","계약유형","계약조항","채널",
+    _all_cols = ["계약조항","판매처코드","판매처명","사업자번호","계약유형","채널",
                  "사업부","사무소","담당자","현 미수금",
                  "유효기준회전일","현 회전일","지연일수(누적)",
                  "요율","지체보상금","계산 근거","비고"]
