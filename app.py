@@ -1037,7 +1037,7 @@ def _read_mo_folder(folder_str: str, _mtime: float = 0):
     folder = Path(folder_str)
     files = sorted(folder.glob("*.xlsx")) + sorted(folder.glob("*.xls"))
     # 기준·가공 안내 파일 제외 (월별 잔고 데이터가 아님)
-    files = [f for f in files if not any(k in f.name for k in ["기준", "가공", "~$"])]
+    files = [f for f in files if not any(k in f.name for k in ["기준", "가공", "오프라인", "~$"])]
     if not files: return None
     dfs = [pd.read_excel(f, dtype=str).dropna(how="all") for f in files]
     combined = pd.concat(dfs, ignore_index=True)
@@ -1080,7 +1080,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v49"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v50"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
@@ -1237,17 +1237,21 @@ def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=
                                 _smo[(y, m)] = d
                         잔고 = max(0.0, cum_s - cum_c)
                         if 잔고 <= 0: continue
-                        # 가중평균 현회전일 (FIFO: 오래된 미결제 매출부터 소진)
+                        # 현회전일: 최초 미결제 매출 월 말일 → 기준월 말일 (방법 B)
                         _base_last = _date(yr, mo, _cal.monthrange(yr, mo)[1])
-                        _rem = 잔고; _wdays = 0.0
+                        _oldest_ym = None
+                        _cum_s2 = _cum_c2 = 0.0
                         for (y, m) in sorted(_smo):
-                            if _rem <= 0: break
-                            net = _smo[(y,m)]['매출'] - _smo[(y,m)].get('수금', 0.0)
-                            if net <= 0: continue
-                            _mlast = _date(y, m, _cal.monthrange(y, m)[1])
-                            _days = (_base_last - _mlast).days
-                            _used = min(net, _rem); _wdays += _used * _days; _rem -= _used
-                        현회전일 = int(round(_wdays / 잔고)) if 잔고 > 0 else 0
+                            _cum_s2 += _smo[(y,m)]['매출']
+                            _cum_c2 += _smo[(y,m)].get('수금', 0.0)
+                            if _cum_s2 > _cum_c2 and _oldest_ym is None:
+                                _oldest_ym = (y, m)
+                        if _oldest_ym:
+                            _old_last = _date(_oldest_ym[0], _oldest_ym[1],
+                                              _cal.monthrange(_oldest_ym[0], _oldest_ym[1])[1])
+                            현회전일 = (_base_last - _old_last).days
+                        else:
+                            현회전일 = 0
                         _cur = _smo.get((yr, mo), {})
                         이번달잔고 = max(0.0, _cur.get('매출', 0.0) - _cur.get('수금', 0.0))
                         _new = {
