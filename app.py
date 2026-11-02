@@ -796,6 +796,7 @@ def make_공문_word(row):
         f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
         f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
     ] if x]
+    _p('※ 연체기준잔고 = 현 미수금 잔액 중 기준회전일을 초과한 금액 (당월 발생 미수금 제외)', size=8.5, sa=1, color='666666')
     if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=2, color='666666')
     else:     _p(sa=2)
     # 계약 근거 조항
@@ -1094,7 +1095,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v53"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v54"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
