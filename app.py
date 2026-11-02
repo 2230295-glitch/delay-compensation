@@ -773,8 +773,15 @@ def make_공문_word(row):
     _지연일수 = int(row["지연일수(누적)"])
     _요율 = str(row["요율"])
     _계산근거 = f'{_연체기준잔고:,}원 × {_지연일수}일 × {_요율}'
+    try:
+        import calendar as _cal
+        _yr, _mo = map(int, 기준월.split('-'))
+        _last = _cal.monthrange(_yr, _mo)[1]
+        _기준일 = f"{_yr}.{_mo:02d}.{_last:02d}"
+    except Exception:
+        _기준일 = 기준월
     details = [
-        ('· 기준일', 기준월),
+        ('· 기준일', _기준일),
         ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
         ('· 연체기준잔고', f'{_연체기준잔고:,} 원'),
         ('· 유효 기준회전일', f'{int(row["유효기준회전일"])}일'),
@@ -1095,7 +1102,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v54"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v55"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
