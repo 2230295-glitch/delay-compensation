@@ -747,6 +747,7 @@ def _공문_doc_setup(doc):
         for cell in th.rows[0].cells: cell._tc.get_or_add_tcPr()
         _tc(th.rows[0].cells[0], f'문서번호 : {doc_no_suffix}')
         _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
+        th.rows[0].cells[0].width = _Cm(11); th.rows[0].cells[1].width = _Cm(5)
         _p(sa=2)
         p = _p(sa=1); _r(p, '수  신', bold=True, size=10.5); _r(p, f'  :  {판매처명} 귀중', size=10.5)
         p = _p(sa=3); _r(p, '제  목', bold=True, size=10.5); _r(p, f'  :  {제목}', bold=True, size=10.5)
@@ -760,7 +761,7 @@ def make_공문_word(row):
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
     판매처명 = str(row.get("판매처명", ""))
     기준월   = str(row.get("기준월", ""))
-    _letterhead(판매처명, "지체보상금 청구의 건", f"지체-{기준월.replace('-','')}-{판매처명[:4]}")
+    _letterhead(판매처명, "지체보상금 청구의 건", f"지체-{기준월.replace('-','')}-{판매처명}")
     _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
@@ -813,7 +814,7 @@ def make_공문_word_cumulative(vendor_df):
     from datetime import date as _d
     today = _d.today()
     _letterhead(판매처명, "지체보상금 청구의 건 (전체 기간)",
-                f"지체-{today.strftime('%Y')}-전체-{판매처명[:4]}")
+                f"지체-{today.strftime('%Y')}-전체-{판매처명}")
     _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=3)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
@@ -1080,7 +1081,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v51"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v52"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
