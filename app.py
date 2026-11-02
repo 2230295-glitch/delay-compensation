@@ -769,15 +769,20 @@ def make_공문_word(row):
     _r(p, 기준월, bold=True, size=10)
     _r(p, ' 기준 지체보상금이 아래와 같이 발생하였기에 청구드립니다.', size=10)
     _p('─ 청구 내역', bold=True, size=10, sa=2)
+    _연체기준잔고 = int(row.get("연체기준잔고", row["현 미수금"]))
+    _지연일수 = int(row["지연일수(누적)"])
+    _요율 = str(row["요율"])
+    _계산근거 = f'{_연체기준잔고:,}원 × {_지연일수}일 × {_요율}'
     details = [
-        ('· 기준월', 기준월),
+        ('· 기준일', 기준월),
         ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
+        ('· 연체기준잔고', f'{_연체기준잔고:,} 원'),
         ('· 유효 기준회전일', f'{int(row["유효기준회전일"])}일'),
         ('· 현 회전일', f'{int(row["현 회전일"])}일'),
-        ('· 지연일수', f'{int(row["지연일수(누적)"])}일'),
-        ('· 요율', str(row["요율"])),
+        ('· 지연일수', f'{_지연일수}일'),
+        ('· 요율', _요율),
         ('· 지체보상금', f'{int(row["지체보상금"]):,} 원'),
-        ('· 계산 근거', str(row.get("계산 근거", ""))),
+        ('· 계산 근거', _계산근거),
     ]
     tbl = doc.add_table(rows=len(details), cols=2); tbl.style = 'Table Grid'
     for i, (lbl, val) in enumerate(details):
@@ -791,8 +796,16 @@ def make_공문_word(row):
         f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
         f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
     ] if x]
-    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=3, color='666666')
-    else:     _p(sa=3)
+    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=2, color='666666')
+    else:     _p(sa=2)
+    # 계약 근거 조항
+    p_clause = _p(sa=3)
+    _r(p_clause, '※ 계약 근거 ', bold=True, size=9)
+    _r(p_clause, '(제6조 제2항) ', bold=True, size=9, color='1A2A6C')
+    _r(p_clause,
+       '"대금 지급이 지연되는 경우 \'을\'은 지연 1일당 청구금액의 [1/1000]을 지체보상금으로 \'갑\'에게 청구할 수 있다. '
+       '그러나 대금 지급의 지연이 불가항력 또는 \'을\'의 귀책사유로 인한 경우에는 그러하지 아니하다."',
+       size=9, color='444444')
     _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
@@ -1081,7 +1094,7 @@ def _build_org_map(m_b):
         return org_map
     except Exception: return {}
 
-_CALC_VER = "v52"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
+_CALC_VER = "v53"  # 계산 로직 변경 시 증가 → 캐시 자동 무효화
 
 @st.cache_data(show_spinner=False)
 def run_calc(m_b, b_b, c_b, t_b, csv_b=None, raw_b=None, biz2_b=None, think25_b=None, ver=_CALC_VER):
