@@ -731,9 +731,9 @@ def _공문_doc_setup(doc):
             shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), fill)
             tcPr.append(shd)
     def _sig():
-        p1 = _p(sa=0, align=_WDA.RIGHT); _r(p1, '서울시 강남구 봉은사로 114길 12', size=11)
-        p2 = _p(sa=0, align=_WDA.RIGHT); _r(p2, '주  식  회  사  ㈜대웅제약', size=11)
-        p3 = _p(sa=3, align=_WDA.RIGHT); _r(p3, '대  표  이  사  이 창 재', size=11)
+        p1 = _p(sa=0, align=_WDA.CENTER); _r(p1, '서울시 강남구 봉은사로 114길 12', size=11)
+        p2 = _p(sa=0, align=_WDA.CENTER); _r(p2, '주  식  회  사  ㈜대웅제약', size=11)
+        p3 = _p(sa=3, align=_WDA.CENTER); _r(p3, '대  표  이  사  이 창 재', size=11)
     def _footer():
         _bline('top', sa=4)
         _p('DAEWOONG PHARMACEUTICAL CO., LTD.', bold=True, size=10, align=_WDA.CENTER, sa=0)
@@ -742,7 +742,7 @@ def _공문_doc_setup(doc):
         from datetime import date as _d
         today = _d.today()
         p_lh = _p(sa=0, align=_WDA.CENTER)
-        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=24, name='맑은 고딕')
+        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=30, name='맑은 고딕')
         p_addr = _p(sa=1, align=_WDA.CENTER)
         _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=11)
         _bline('bottom', sa=3)
@@ -764,7 +764,7 @@ def _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=True):
         doc.add_page_break()
 
     p_lh = _p(sa=0, align=_WDA.CENTER)
-    _r(p_lh, '(주)  대 웅 제 약', bold=True, size=24, name='맑은 고딕')
+    _r(p_lh, '(주)  대 웅 제 약', bold=True, size=30, name='맑은 고딕')
     p_addr = _p(sa=1, align=_WDA.CENTER)
     _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=11)
     _bline('bottom', sa=2)
@@ -828,7 +828,6 @@ def make_공문_word(row):
     판매처명 = str(row.get("판매처명", ""))
     기준월   = str(row.get("기준월", ""))
     _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건", f"지체-{기준월.replace('-','')}-{판매처명}")
-    _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=2)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약㈜와 귀 병원 간에 체결된 ', size=10)
@@ -850,33 +849,29 @@ def make_공문_word(row):
     except Exception:
         _기준일 = 기준월
     details = [
-        ('· 기준일', _기준일),
-        ('· 거래품목', 'thynC™ (실시간 환자 모니터링 시스템)'),
-        ('· 기준일 현재 미회수 잔액', f'{int(row["현 미수금"]):,} 원'),
-        ('· 연체기준잔고', f'{_연체기준잔고:,} 원'),
-        ('· 유효기준회전일  /  현 회전일', f'{int(row["유효기준회전일"])}일  /  {int(row["현 회전일"])}일'),
-        ('· 지연일수', f'{_지연일수}일'),
-        ('· 요율', _요율),
-        ('· 지체보상금', f'{int(row["지체보상금"]):,} 원'),
-        ('· 계산 근거', _계산근거),
+        ('•기준일', _기준일),
+        ('•거래품목', 'thynC™ (실시간 환자 모니터링 시스템)'),
+        ('•기준일 현재 미회수 잔액', f'{int(row["현 미수금"]):,} 원'),
+        ('•연체기준잔고', f'{_연체기준잔고:,} 원'),
+        ('•유효기준회전일  /  현 회전일', f'{int(row["유효기준회전일"])}일  /  {int(row["현 회전일"])}일'),
+        ('•지연일수', f'{_지연일수}일'),
+        ('•요율', _요율),
+        ('•지체보상금', f'{int(row["지체보상금"]):,} 원'),
+        ('•계산 근거', _계산근거),
     ]
-    tbl = doc.add_table(rows=len(details), cols=2); tbl.style = 'Table Grid'
-    for i, (lbl, val) in enumerate(details):
-        _tc(tbl.rows[i].cells[0], lbl, bold=True, fill='EEEEF5')
-        _tc(tbl.rows[i].cells[1], val, color='C0392B' if '지체보상금' in lbl else None)
-    for r_obj in tbl.rows:
-        r_obj.cells[0].width = _Cm(5.5); r_obj.cells[1].width = _Cm(9.5)
+    for lbl, val in details:
+        p_item = _p(sa=1)
+        _r(p_item, f'{lbl}: ', bold=True, size=10)
+        _r(p_item, val, size=10, color='C0392B' if '지체보상금' in lbl else None)
+    _p('※ 지체보상금 발생 및 산정 기준: 지급기일 경과 시 지연 1일당 청구금액 × 1/1,000', size=8.5, sa=1, color='666666')
     사업자번호 = str(row.get("사업자번호", "")).strip()
     계약유형   = str(row.get("계약유형",   "")).strip()
     parts = [x for x in [
         f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
         f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
     ] if x]
-    _p('※ 지체보상금 발생 및 산정 기준: 지급기일 경과 시 지연 1일당 청구금액 × 1/1,000', size=8.5, sa=1, color='666666')
-    _p('※ 연체기준잔고 = 현 미수금 잔액 중 기준회전일을 초과한 금액 (당월 발생 미수금 제외)', size=8.5, sa=1, color='666666')
     if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=3, color='666666')
     else:     _p(sa=3)
-    _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
@@ -899,7 +894,6 @@ def make_공문_word_cumulative(vendor_df):
     today = _d.today()
     _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건",
                 f"지체-{today.strftime('%Y')}-전체-{판매처명}")
-    _p('1.', bold=True, size=10, sa=2)
     p = _p(sa=2)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
     _r(p, '당사 대웅제약㈜와 귀 병원 간에 체결된 ', size=10)
@@ -941,7 +935,6 @@ def make_공문_word_cumulative(vendor_df):
     p_tot = _p(sa=5, align=_WDA.RIGHT)
     _r(p_tot, '※ 합계 청구금액 : ', bold=True, size=11)
     _r(p_tot, f'{total:,} 원', bold=True, size=13, color='C0392B')
-    _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
