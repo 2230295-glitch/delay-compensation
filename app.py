@@ -689,16 +689,16 @@ def make_full_excel(df):
 
 def _공문_doc_setup(doc):
     sec0 = doc.sections[0]
-    sec0.top_margin = _Cm(1.3); sec0.bottom_margin = _Cm(1.0)
-    sec0.left_margin = _Cm(1.8); sec0.right_margin = _Cm(1.8)
-    def _rf(run, name='맑은 고딕'):
+    sec0.top_margin = _Cm(1.27); sec0.bottom_margin = _Cm(1.27)
+    sec0.left_margin = _Cm(1.27); sec0.right_margin = _Cm(1.27)
+    def _rf(run, name='나눔고딕'):
         rPr = run._r.get_or_add_rPr()
         for t in list(rPr):
             if t.tag == _dqn('w:rFonts'): rPr.remove(t)
         rf = _dxml('w:rFonts')
         rf.set(_dqn('w:ascii'), name); rf.set(_dqn('w:eastAsia'), name); rf.set(_dqn('w:hAnsi'), name)
         rPr.insert(0, rf)
-    def _r(para, text, bold=False, size=10, color=None, name='맑은 고딕'):
+    def _r(para, text, bold=False, size=10, color=None, name='나눔고딕'):
         run = para.add_run(text)
         run.bold = bold; run.font.size = _Pt(size); run.font.name = name
         if color: run.font.color.rgb = _RGB.from_string(color)
@@ -717,12 +717,12 @@ def _공문_doc_setup(doc):
         bdr.set(_dqn('w:val'), 'single'); bdr.set(_dqn('w:sz'), '18')
         bdr.set(_dqn('w:space'), '1'); bdr.set(_dqn('w:color'), '1A2A6C')
         pBdr.append(bdr); pPr.append(pBdr)
-    def _tc(cell, text, bold=False, size=9.5, color=None, fill=None, align=_WDA.LEFT):
+    def _tc(cell, text, bold=False, size=10, color=None, fill=None, align=_WDA.LEFT):
         para = cell.paragraphs[0]
         run = para.add_run(str(text))
-        run.bold = bold; run.font.size = _Pt(size); run.font.name = '맑은 고딕'
+        run.bold = bold; run.font.size = _Pt(size); run.font.name = '나눔고딕'
         if color: run.font.color.rgb = _RGB.from_string(color)
-        _rf(run); para.alignment = align
+        _rf(run, '나눔고딕'); para.alignment = align
         if fill:
             tcPr = cell._tc.get_or_add_tcPr()
             for tag in list(tcPr):
@@ -731,9 +731,9 @@ def _공문_doc_setup(doc):
             shd.set(_dqn('w:val'), 'clear'); shd.set(_dqn('w:color'), 'auto'); shd.set(_dqn('w:fill'), fill)
             tcPr.append(shd)
     def _sig():
-        p1 = _p(sa=0, align=_WDA.RIGHT); _r(p1, '서울시 강남구 봉은사로 114길 12', size=9.5)
-        p2 = _p(sa=0, align=_WDA.RIGHT); _r(p2, '주 식 회 사  대 웅 제 약', size=10)
-        p3 = _p(sa=3, align=_WDA.RIGHT); _r(p3, '대 표 이 사   이 창 재', size=10)
+        p1 = _p(sa=0, align=_WDA.RIGHT); _r(p1, '서울시 강남구 봉은사로 114길 12', size=11)
+        p2 = _p(sa=0, align=_WDA.RIGHT); _r(p2, '주  식  회  사  ㈜대웅제약', size=11)
+        p3 = _p(sa=3, align=_WDA.RIGHT); _r(p3, '대  표  이  사  이 창 재', size=11)
     def _footer():
         _bline('top', sa=4)
         _p('DAEWOONG PHARMACEUTICAL CO., LTD.', bold=True, size=10, align=_WDA.CENTER, sa=0)
@@ -741,29 +741,32 @@ def _공문_doc_setup(doc):
     def _letterhead(판매처명, 제목, doc_no_suffix):
         from datetime import date as _d
         today = _d.today()
-        p_lh = _p(sa=0, align=_WDA.CENTER); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+        p_lh = _p(sa=0, align=_WDA.CENTER)
+        _r(p_lh, '(주)  대 웅 제 약', bold=True, size=24, name='맑은 고딕')
         p_addr = _p(sa=1, align=_WDA.CENTER)
-        _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=8.5, color='555555')
+        _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=11)
         _bline('bottom', sa=3)
         th = doc.add_table(rows=1, cols=2)
         for cell in th.rows[0].cells: cell._tc.get_or_add_tcPr()
         _tc(th.rows[0].cells[0], f'문서번호 : {doc_no_suffix}')
         _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
-        th.rows[0].cells[0].width = _Cm(11); th.rows[0].cells[1].width = _Cm(5)
+        th.rows[0].cells[0].width = _Cm(12); th.rows[0].cells[1].width = _Cm(5.46)
         _p(sa=2)
-        p = _p(sa=1); _r(p, '수    신', bold=True, size=10.5); _r(p, f'  :  {판매처명} 귀중', size=10.5)
-        p = _p(sa=3); _r(p, '제    목', bold=True, size=10.5); _r(p, f'  :  {제목}', bold=True, size=10.5)
+        p = _p(sa=1); _r(p, '수    신', bold=True, size=11); _r(p, f'  :  {판매처명} 귀중', size=11)
+        p = _p(sa=3); _r(p, '제    목', bold=True, size=11); _r(p, f'  :  {제목}', bold=True, size=11)
         _bline('top', sa=5)
         return today
     return _r, _p, _bline, _tc, _sig, _footer, _letterhead
 
-def _append_안내장(doc, _r, _p, _bline, _tc, _footer):
-    """현재 doc 에 페이지 나누기 + 안내장 1페이지 추가"""
-    doc.add_page_break()
+def _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=True):
+    """현재 doc 에 (페이지 나누기 +) 안내장 1페이지 추가"""
+    if add_break:
+        doc.add_page_break()
 
-    p_lh = _p(sa=0, align=_WDA.CENTER); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=18)
+    p_lh = _p(sa=0, align=_WDA.CENTER)
+    _r(p_lh, '(주)  대 웅 제 약', bold=True, size=24, name='맑은 고딕')
     p_addr = _p(sa=1, align=_WDA.CENTER)
-    _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=8.5, color='555555')
+    _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=11)
     _bline('bottom', sa=2)
     p_title = _p(sa=3, align=_WDA.CENTER)
     _r(p_title, 'thynC™  지체보상금 제도 안내', bold=True, size=14)
@@ -953,7 +956,7 @@ def make_안내장_word():
     if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
     doc = _DocxDoc()
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
-    _append_안내장(doc, _r, _p, _bline, _tc, _footer)
+    _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=False)
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 
