@@ -758,7 +758,7 @@ def _공문_doc_setup(doc):
         return today
     return _r, _p, _bline, _tc, _sig, _footer, _letterhead
 
-def _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=True):
+def _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=True, 계약근거조항='제6조 제2항'):
     """현재 doc 에 (페이지 나누기 +) 안내장 1페이지 추가"""
     if add_break:
         doc.add_page_break()
@@ -780,7 +780,7 @@ def _append_안내장(doc, _r, _p, _bline, _tc, _footer, add_break=True):
 
     _p('■  계약 근거', bold=True, size=10, sa=1)
     p2 = _p(sa=1)
-    _r(p2, '  제6조 제2항 ', bold=True, size=9.5, color='1A2A6C')
+    _r(p2, f'  {계약근거조항} ', bold=True, size=9.5, color='1A2A6C')
     _r(p2, '— "대금 지급이 지연되는 경우 \'을\'은 지연 1일당 청구금액의 [1/1000]을 지체보상금으로\n'
            '  \'갑\'에게 청구할 수 있다. (불가항력 또는 \'을\'의 귀책사유로 인한 경우 제외)"',
            size=9, color='444444')
@@ -827,6 +827,7 @@ def make_공문_word(row):
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
     판매처명 = str(row.get("판매처명", ""))
     기준월   = str(row.get("기준월", ""))
+    _계약근거조항 = str(row.get("계약근거조항", "")).strip() or "제6조2항"
     _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건", f"지체-{기준월.replace('-','')}-{판매처명}")
     p = _p(sa=2)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
@@ -834,7 +835,7 @@ def make_공문_word(row):
     _r(p, 'thynC™ 상품공급 계약서', bold=True, size=10)
     _r(p, '에 따라 이루어진 ', size=10)
     _r(p, 'thynC™ (실시간 환자 모니터링 시스템)', bold=True, size=10)
-    _r(p, ' 거래와 관련하여 계약서 제6조2항에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 아래와 같이 미회수 대금 현황을 안내 드립니다.', size=10)
+    _r(p, f' 거래와 관련하여 계약서 {_계약근거조항}에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 아래와 같이 미회수 대금 현황을 안내 드립니다.', size=10)
     p2 = _p(sa=3)
     _r(p2, '본 공문은 귀 병원과의 거래 내역을 다시 한 번 공유 드리고, 정산 과정에서의 누락 또는 착오 여부를 확인하고자 발송 드리는 것으로 원활한 정산을 위한 귀 병원의 협조를 정중히 요청 드립니다.', size=10)
     _연체기준잔고 = int(row.get("연체기준잔고", row["현 미수금"]))
@@ -860,8 +861,8 @@ def make_공문_word(row):
         ('•계산 근거', _계산근거),
     ]
     for lbl, val in details:
-        p_item = _p(sa=1)
-        _r(p_item, f'{lbl}: ', bold=True, size=10)
+        p_item = _p(sa=2)
+        _r(p_item, f'{lbl}:  ', bold=True, size=10)
         _r(p_item, val, size=10, color='C0392B' if '지체보상금' in lbl else None)
     _p('※ 지체보상금 발생 및 산정 기준: 지급기일 경과 시 지연 1일당 청구금액 × 1/1,000', size=8.5, sa=1, color='666666')
     사업자번호 = str(row.get("사업자번호", "")).strip()
@@ -878,7 +879,7 @@ def make_공문_word(row):
     _r(p, ' 일정에 맞추어 정산 진행 또는 회신을 부탁드립니다.', size=10)
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig(); _footer()
-    _append_안내장(doc, _r, _p, _bline, _tc, _footer)
+    _append_안내장(doc, _r, _p, _bline, _tc, _footer, 계약근거조항=_계약근거조항)
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 def make_공문_word_cumulative(vendor_df):
@@ -890,6 +891,7 @@ def make_공문_word_cumulative(vendor_df):
     period = f"{months[0]} ~ {months[-1]}"
     판매처명 = str(first.get("판매처명", ""))
     total = int(vendor_df["지체보상금"].sum())
+    _계약근거조항 = str(first.get("계약근거조항", "")).strip() or "제6조2항"
     from datetime import date as _d
     today = _d.today()
     _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건",
@@ -900,7 +902,7 @@ def make_공문_word_cumulative(vendor_df):
     _r(p, 'thynC™ 상품공급 계약서', bold=True, size=10)
     _r(p, '에 따라 이루어진 ', size=10)
     _r(p, 'thynC™ (실시간 환자 모니터링 시스템)', bold=True, size=10)
-    _r(p, ' 거래와 관련하여 계약서 제6조2항에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 ', size=10)
+    _r(p, f' 거래와 관련하여 계약서 {_계약근거조항}에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 ', size=10)
     _r(p, period, bold=True, size=10)
     _r(p, ' 기간 미회수 대금 현황을 아래와 같이 안내 드립니다.', size=10)
     p2 = _p(sa=3)
@@ -941,7 +943,7 @@ def make_공문_word_cumulative(vendor_df):
     _r(p, ' 일정에 맞추어 정산 진행 또는 회신을 부탁드립니다.', size=10)
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig(); _footer()
-    _append_안내장(doc, _r, _p, _bline, _tc, _footer)
+    _append_안내장(doc, _r, _p, _bline, _tc, _footer, 계약근거조항=_계약근거조항)
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
 def make_안내장_word():
