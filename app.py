@@ -881,7 +881,92 @@ def make_공문_word_cumulative(vendor_df):
     _sig(); _footer()
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 
-def make_공문_zip(df, month_label):
+def make_안내장_word():
+    """지체보상금 제도 안내장 Word 문서 생성"""
+    if not _HAS_DOCX: raise ImportError("pip install python-docx 후 재시작 필요")
+    doc = _DocxDoc()
+    _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
+
+    # 레터헤드
+    p_lh = _p(sa=1); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+    _bline('bottom', sa=3)
+
+    p_title = _p(sa=6, align=_WDA.CENTER)
+    _r(p_title, 'thync™ 지체보상금 제도 안내', bold=True, size=16)
+
+    _bline('bottom', sa=4)
+
+    # 1. 지체보상금 제도 소개
+    _p('1.  지체보상금 제도란?', bold=True, size=11, sa=2)
+    p1 = _p(sa=4)
+    _r(p1, '  지체보상금이란 ', size=10)
+    _r(p1, 'thync™ 상품공급 계약서', bold=True, size=10)
+    _r(p1, '에 따라 대금 지급이 약정 기일을 초과하여 지연되는 경우, 계약 조항에 근거하여\n'
+           '  대웅제약이 거래처에 청구하는 지연 보상금입니다.\n'
+           '  대금을 약정 기일 내에 납부하시면 지체보상금은 발생하지 않습니다.', size=10)
+
+    # 2. 계약 근거
+    _p('2.  계약 근거', bold=True, size=11, sa=2)
+    p2 = _p(sa=4)
+    _r(p2, '  thync™ 상품공급 계약서 ', size=10)
+    _r(p2, '제6조 제2항', bold=True, size=10, color='1A2A6C')
+    _r(p2, '\n  "대금 지급이 지연되는 경우 \'을\'은 지연 1일당 청구금액의 [1/1000]을 지체보상금으로\n'
+           '  \'갑\'에게 청구할 수 있다. 그러나 대금 지급의 지연이 불가항력 또는 \'을\'의 귀책사유로\n'
+           '  인한 경우에는 그러하지 아니하다."', size=9.5, color='444444')
+
+    # 3. 계산 방법
+    _p('3.  지체보상금 계산 방법', bold=True, size=11, sa=2)
+    calc_rows = [
+        ('계산 공식', '연체기준잔고  ×  지연일수  ×  요율(1/1,000)'),
+        ('연체기준잔고', 'SAP 순실잔고 중 기준회전일을 초과한 금액\n(당월 발생 미수금 제외)'),
+        ('기준회전일', '계약상 약정 대금 납부 기한(일)'),
+        ('지연일수', '현 회전일 − 유효기준회전일'),
+        ('요율', '1/1,000 (계약서 명시 기준)'),
+    ]
+    tbl = doc.add_table(rows=len(calc_rows), cols=2); tbl.style = 'Table Grid'
+    for i, (lbl, val) in enumerate(calc_rows):
+        _tc(tbl.rows[i].cells[0], lbl, bold=True, fill='EEEEF5', size=9.5)
+        _tc(tbl.rows[i].cells[1], val, size=9.5,
+            color='C0392B' if '계산 공식' in lbl else None)
+    for r_obj in tbl.rows:
+        r_obj.cells[0].width = _Cm(4.5); r_obj.cells[1].width = _Cm(10.5)
+    _p(sa=4)
+
+    # 4. 계산 예시
+    _p('4.  계산 예시', bold=True, size=11, sa=2)
+    ex_rows = [
+        ('연체기준잔고', '50,000,000 원'),
+        ('유효기준회전일', '30 일'),
+        ('현 회전일', '60 일'),
+        ('지연일수', '30 일'),
+        ('지체보상금', '50,000,000 × 30 × 1/1,000 = 1,500,000 원'),
+    ]
+    tbl2 = doc.add_table(rows=len(ex_rows), cols=2); tbl2.style = 'Table Grid'
+    for i, (lbl, val) in enumerate(ex_rows):
+        _tc(tbl2.rows[i].cells[0], lbl, bold=True, fill='F5F5FF', size=9.5)
+        _tc(tbl2.rows[i].cells[1], val, size=9.5,
+            color='C0392B' if '지체보상금' in lbl else None)
+    for r_obj in tbl2.rows:
+        r_obj.cells[0].width = _Cm(4.5); r_obj.cells[1].width = _Cm(10.5)
+    _p(sa=4)
+
+    # 5. 납부 방법 및 문의
+    _p('5.  납부 방법 및 문의처', bold=True, size=11, sa=2)
+    p5 = _p(sa=2)
+    _r(p5, '  •  지체보상금은 ', size=10)
+    _r(p5, '별도 청구 공문', bold=True, size=10)
+    _r(p5, '에 명시된 기일에 맞추어 회신 및 납부 부탁드립니다.', size=10)
+    p6 = _p(sa=5)
+    _r(p6, '  •  문의사항은 담당 영업사원 또는 대웅제약 영업관리1팀 판매관리파트로 연락 바랍니다.', size=10)
+
+    _bline('top', sa=4)
+    _p('본 안내장은 대웅제약 thync™ 거래처를 대상으로 발송되는 공식 안내 자료입니다.', size=8.5, align=_WDA.CENTER, sa=0, color='9E9E9E')
+    _footer()
+
+    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
+
+
+def make_공문_zip(df, month_label, include_안내장=True):
     buf = io.BytesIO()
     def _calc_str(r):
         if r["지체보상금"] <= 0: return "—"
@@ -894,9 +979,14 @@ def make_공문_zip(df, month_label):
             safe = re.sub(r'[\\/:*?"<>|]', '_', str(row["판매처명"]).strip())
             fname = f"지체보상금청구_{safe}_{row['기준월']}.docx"
             zf.writestr(fname, make_공문_word(row))
+        if include_안내장:
+            try:
+                zf.writestr("지체보상금_제도안내.docx", make_안내장_word())
+            except Exception:
+                pass
     return buf.getvalue()
 
-def make_공문_zip_cumulative(result_df):
+def make_공문_zip_cumulative(result_df, include_안내장=True):
     charge_df = result_df[result_df["지체보상금"] > 0]
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -905,6 +995,11 @@ def make_공문_zip_cumulative(result_df):
             safe = re.sub(r'[\\/:*?"<>|]', '_', str(name).strip())
             fname = f"지체보상금청구_{safe}_전체기간.docx"
             zf.writestr(fname, make_공문_word_cumulative(grp))
+        if include_안내장:
+            try:
+                zf.writestr("지체보상금_제도안내.docx", make_안내장_word())
+            except Exception:
+                pass
     return buf.getvalue()
 
 def load_raw_monthly_sales(file_bytes):
@@ -2001,7 +2096,25 @@ with tab_detail:
             mime="application/zip",
             disabled=(n_vendors == 0),
             use_container_width=True, key="btn_dl_all_docx",
-            help="전체 기간 거래처별 누적 공문 ZIP",
+            help="전체 기간 거래처별 누적 공문 ZIP (안내장 포함)",
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="dl-card" style="margin-top:.5rem">'
+                '<div class="dl-card-title">안내장</div>', unsafe_allow_html=True)
+    _dc_ann, _ = st.columns([2, 2])
+    with _dc_ann:
+        try:
+            _안내장_bytes = make_안내장_word()
+        except Exception:
+            _안내장_bytes = b""
+        st.download_button(
+            "📋 지체보상금 제도 안내장",
+            data=_안내장_bytes,
+            file_name=f"지체보상금_제도안내_{date.today():%Y%m%d}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True, key="btn_dl_안내장",
+            help="공문 발송 시 함께 첨부하는 지체보상금 제도 안내장 (공문 ZIP에도 자동 포함)",
+            disabled=(not _HAS_DOCX),
         )
     st.markdown('</div>', unsafe_allow_html=True)
 
