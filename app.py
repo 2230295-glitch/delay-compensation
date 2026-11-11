@@ -741,7 +741,9 @@ def _공문_doc_setup(doc):
     def _letterhead(판매처명, 제목, doc_no_suffix):
         from datetime import date as _d
         today = _d.today()
-        p_lh = _p(sa=1); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+        p_lh = _p(sa=0, align=_WDA.CENTER); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=20)
+        p_addr = _p(sa=1, align=_WDA.CENTER)
+        _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=8.5, color='555555')
         _bline('bottom', sa=3)
         th = doc.add_table(rows=1, cols=2)
         for cell in th.rows[0].cells: cell._tc.get_or_add_tcPr()
@@ -749,8 +751,8 @@ def _공문_doc_setup(doc):
         _tc(th.rows[0].cells[1], today.strftime("%Y년 %m월 %d일"), align=_WDA.RIGHT)
         th.rows[0].cells[0].width = _Cm(11); th.rows[0].cells[1].width = _Cm(5)
         _p(sa=2)
-        p = _p(sa=1); _r(p, '수  신', bold=True, size=10.5); _r(p, f'  :  {판매처명} 귀중', size=10.5)
-        p = _p(sa=3); _r(p, '제  목', bold=True, size=10.5); _r(p, f'  :  {제목}', bold=True, size=10.5)
+        p = _p(sa=1); _r(p, '수    신', bold=True, size=10.5); _r(p, f'  :  {판매처명} 귀중', size=10.5)
+        p = _p(sa=3); _r(p, '제    목', bold=True, size=10.5); _r(p, f'  :  {제목}', bold=True, size=10.5)
         _bline('top', sa=5)
         return today
     return _r, _p, _bline, _tc, _sig, _footer, _letterhead
@@ -759,10 +761,12 @@ def _append_안내장(doc, _r, _p, _bline, _tc, _footer):
     """현재 doc 에 페이지 나누기 + 안내장 1페이지 추가"""
     doc.add_page_break()
 
-    p_lh = _p(sa=1); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=18)
+    p_lh = _p(sa=0, align=_WDA.CENTER); _r(p_lh, '(주)  대 웅 제 약', bold=True, size=18)
+    p_addr = _p(sa=1, align=_WDA.CENTER)
+    _r(p_addr, '우) 06170  서울시 강남구 봉은사로 114길 12', size=8.5, color='555555')
     _bline('bottom', sa=2)
     p_title = _p(sa=3, align=_WDA.CENTER)
-    _r(p_title, 'thync™  지체보상금 제도 안내', bold=True, size=14)
+    _r(p_title, 'thynC™  지체보상금 제도 안내', bold=True, size=14)
 
     _p('■  제도 개요', bold=True, size=10, sa=1)
     p1 = _p(sa=1)
@@ -820,14 +824,17 @@ def make_공문_word(row):
     _r, _p, _bline, _tc, _sig, _footer, _letterhead = _공문_doc_setup(doc)
     판매처명 = str(row.get("판매처명", ""))
     기준월   = str(row.get("기준월", ""))
-    _letterhead(판매처명, "지체보상금 청구의 건", f"지체-{기준월.replace('-','')}-{판매처명}")
+    _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건", f"지체-{기준월.replace('-','')}-{판매처명}")
     _p('1.', bold=True, size=10, sa=2)
-    p = _p(sa=3)
+    p = _p(sa=2)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
-    _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
-    _r(p, 기준월, bold=True, size=10)
-    _r(p, ' 기준 지체보상금이 아래와 같이 발생하였기에 청구드립니다.', size=10)
-    _p('─ 청구 내역', bold=True, size=10, sa=2)
+    _r(p, '당사 대웅제약㈜와 귀 병원 간에 체결된 ', size=10)
+    _r(p, 'thynC™ 상품공급 계약서', bold=True, size=10)
+    _r(p, '에 따라 이루어진 ', size=10)
+    _r(p, 'thynC™ (실시간 환자 모니터링 시스템)', bold=True, size=10)
+    _r(p, ' 거래와 관련하여 계약서 제6조2항에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 아래와 같이 미회수 대금 현황을 안내 드립니다.', size=10)
+    p2 = _p(sa=3)
+    _r(p2, '본 공문은 귀 병원과의 거래 내역을 다시 한 번 공유 드리고, 정산 과정에서의 누락 또는 착오 여부를 확인하고자 발송 드리는 것으로 원활한 정산을 위한 귀 병원의 협조를 정중히 요청 드립니다.', size=10)
     _연체기준잔고 = int(row.get("연체기준잔고", row["현 미수금"]))
     _지연일수 = int(row["지연일수(누적)"])
     _요율 = str(row["요율"])
@@ -841,10 +848,10 @@ def make_공문_word(row):
         _기준일 = 기준월
     details = [
         ('· 기준일', _기준일),
-        ('· 현 미수금 잔액', f'{int(row["현 미수금"]):,} 원'),
+        ('· 거래품목', 'thynC™ (실시간 환자 모니터링 시스템)'),
+        ('· 기준일 현재 미회수 잔액', f'{int(row["현 미수금"]):,} 원'),
         ('· 연체기준잔고', f'{_연체기준잔고:,} 원'),
-        ('· 유효 기준회전일', f'{int(row["유효기준회전일"])}일'),
-        ('· 현 회전일', f'{int(row["현 회전일"])}일'),
+        ('· 유효기준회전일  /  현 회전일', f'{int(row["유효기준회전일"])}일  /  {int(row["현 회전일"])}일'),
         ('· 지연일수', f'{_지연일수}일'),
         ('· 요율', _요율),
         ('· 지체보상금', f'{int(row["지체보상금"]):,} 원'),
@@ -862,22 +869,15 @@ def make_공문_word(row):
         f'사업자번호: {사업자번호}' if 사업자번호 not in ("", "nan") else "",
         f'계약유형: {계약유형}'     if 계약유형   not in ("", "nan") else "",
     ] if x]
+    _p('※ 지체보상금 발생 및 산정 기준: 지급기일 경과 시 지연 1일당 청구금액 × 1/1,000', size=8.5, sa=1, color='666666')
     _p('※ 연체기준잔고 = 현 미수금 잔액 중 기준회전일을 초과한 금액 (당월 발생 미수금 제외)', size=8.5, sa=1, color='666666')
-    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=2, color='666666')
-    else:     _p(sa=2)
-    # 계약 근거 조항
-    p_clause = _p(sa=3)
-    _r(p_clause, '※ 계약 근거 ', bold=True, size=9)
-    _r(p_clause, '(제6조 제2항) ', bold=True, size=9, color='1A2A6C')
-    _r(p_clause,
-       '"대금 지급이 지연되는 경우 \'을\'은 지연 1일당 청구금액의 [1/1000]을 지체보상금으로 \'갑\'에게 청구할 수 있다. '
-       '그러나 대금 지급의 지연이 불가항력 또는 \'을\'의 귀책사유로 인한 경우에는 그러하지 아니하다."',
-       size=9, color='444444')
+    if parts: _p(f'※ {" | ".join(parts)}', size=8.5, sa=3, color='666666')
+    else:     _p(sa=3)
     _p('2.', bold=True, size=10, sa=2)
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
-    _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
+    _r(p, ' 일정에 맞추어 정산 진행 또는 회신을 부탁드립니다.', size=10)
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig(); _footer()
     _append_안내장(doc, _r, _p, _bline, _tc, _footer)
@@ -894,14 +894,20 @@ def make_공문_word_cumulative(vendor_df):
     total = int(vendor_df["지체보상금"].sum())
     from datetime import date as _d
     today = _d.today()
-    _letterhead(판매처명, "지체보상금 청구의 건 (전체 기간)",
+    _letterhead(판매처명, "미회수 대금 확인 및 정산 요청의 건",
                 f"지체-{today.strftime('%Y')}-전체-{판매처명}")
     _p('1.', bold=True, size=10, sa=2)
-    p = _p(sa=3)
+    p = _p(sa=2)
     _r(p, '귀원의 무궁한 발전을 기원합니다.\n', size=10)
-    _r(p, '당사 대웅제약과 귀 병원 간에 체결된 thync™ 상품공급 계약서에 따라 이루어진 거래와 관련하여 ', size=10)
+    _r(p, '당사 대웅제약㈜와 귀 병원 간에 체결된 ', size=10)
+    _r(p, 'thynC™ 상품공급 계약서', bold=True, size=10)
+    _r(p, '에 따라 이루어진 ', size=10)
+    _r(p, 'thynC™ (실시간 환자 모니터링 시스템)', bold=True, size=10)
+    _r(p, ' 거래와 관련하여 계약서 제6조2항에 따라 세금계산서 수령후 30일 이내 지급되어야 할 물품 대금이 현재까지 정산되지 않아 ', size=10)
     _r(p, period, bold=True, size=10)
-    _r(p, ' 기간 동안 발생한 지체보상금 합계를 아래와 같이 청구드립니다.', size=10)
+    _r(p, ' 기간 미회수 대금 현황을 아래와 같이 안내 드립니다.', size=10)
+    p2 = _p(sa=3)
+    _r(p2, '본 공문은 귀 병원과의 거래 내역을 다시 한 번 공유 드리고, 정산 과정에서의 누락 또는 착오 여부를 확인하고자 발송 드리는 것으로 원활한 정산을 위한 귀 병원의 협조를 정중히 요청 드립니다.', size=10)
     _p('─ 월별 청구 내역', bold=True, size=10, sa=2)
     hdrs = ["기준월", "연체기준잔고", "기준회전일", "현 회전일", "지연일수", "요율", "지체보상금"]
     sorted_df = vendor_df.sort_values("기준월")
@@ -936,7 +942,7 @@ def make_공문_word_cumulative(vendor_df):
     p = _p(sa=5)
     _r(p, '상기 내용에 대해 확인하시어, 가능하신 ', size=10)
     _r(p, '______년  ______월  ______일', size=10)
-    _r(p, ' 일정에 맞추어 회신을 부탁드립니다.', size=10)
+    _r(p, ' 일정에 맞추어 정산 진행 또는 회신을 부탁드립니다.', size=10)
     _p('거래처명 :                                                                                   (인)', size=10, sa=6)
     _sig(); _footer()
     _append_안내장(doc, _r, _p, _bline, _tc, _footer)
